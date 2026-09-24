@@ -6,9 +6,11 @@ from app.dependency.service import (
     CatalogServiceDep,
     ClassificationServiceDep,
     DuplicateDetectionServiceDep,
+    DuplicateExplanationServiceDep,
 )
 from app.use_cases.classify_software import ClassifySoftwareUseCase
 from app.use_cases.create_catalog_item import CreateCatalogItemUseCase
+from app.use_cases.explain_duplicate import ExplainDuplicateUseCase
 from app.use_cases.find_duplicates import FindDuplicatesUseCase
 from app.use_cases.get_catalog_item import GetCatalogItemUseCase
 from app.use_cases.list_catalog_items import ListCatalogItemsUseCase
@@ -36,6 +38,12 @@ def get_find_duplicates_use_case(
     return FindDuplicatesUseCase(service)
 
 
+def get_explain_duplicate_use_case(
+    service: DuplicateExplanationServiceDep,
+) -> ExplainDuplicateUseCase:
+    return ExplainDuplicateUseCase(service)
+
+
 ClassifySoftwareUseCaseDep = Annotated[
     ClassifySoftwareUseCase, Depends(get_classify_software_use_case)
 ]
@@ -50,4 +58,7 @@ GetCatalogItemUseCaseDep = Annotated[
 ]
 FindDuplicatesUseCaseDep = Annotated[
     FindDuplicatesUseCase, Depends(get_find_duplicates_use_case)
+]
+ExplainDuplicateUseCaseDep = Annotated[
+    ExplainDuplicateUseCase, Depends(get_explain_duplicate_use_case)
 ]

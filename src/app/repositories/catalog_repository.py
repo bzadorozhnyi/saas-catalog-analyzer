@@ -1,3 +1,5 @@
+import asyncio
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -10,6 +12,7 @@ from app.models.software_item import SoftwareItem
 class CatalogRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+        self._lock = asyncio.Lock()
 
     async def create(
         self,
@@ -24,25 +27,32 @@ class CatalogRepository:
             category=category,
             embedding=embedding,
         )
-        self._session.add(item)
-        await self._session.flush()
+        async with self._lock:
+            self._session.add(item)
+            await self._session.flush()
         return item
 
     async def list_all(self) -> list[SoftwareItem]:
-        result = await self._session.execute(select(SoftwareItem))
+        async with self._lock:
+            result = await self._session.execute(select(SoftwareItem))
         return list(result.scalars().all())
 
     async def get(self, item_id: int) -> SoftwareItem | None:
-        return await self._session.get(SoftwareItem, item_id)
+        async with self._lock:
+            return await self._session.get(SoftwareItem, item_id)
 
     async def get_by_name(self, name: str) -> SoftwareItem | None:
-        result = await self._session.execute(select(SoftwareItem).where(SoftwareItem.name == name))
+        async with self._lock:
+            result = await self._session.execute(
+                select(SoftwareItem).where(SoftwareItem.name == name)
+            )
         return result.scalar_one_or_none()
 
     async def list_by_names(self, names: list[str]) -> list[SoftwareItem]:
-        result = await self._session.execute(
-            select(SoftwareItem).where(SoftwareItem.name.in_(names))
-        )
+        async with self._lock:
+            result = await self._session.execute(
+                select(SoftwareItem).where(SoftwareItem.name.in_(names))
+            )
         return list(result.scalars().all())
 
     async def find_similar_pairs(
@@ -59,5 +69,6 @@ class CatalogRepository:
             .where(similarity >= min_similarity)
             .order_by(similarity.desc())
         )
-        result = await self._session.execute(stmt)
+        async with self._lock:
+            result = await self._session.execute(stmt)
         return [SimilarPair(*row) for row in result.all()]
