@@ -14,7 +14,7 @@ def client() -> TestClient:
 def test_classify_returns_structured_result(client: TestClient) -> None:
     with classification_agent.override(model=TestModel()):
         response = client.post(
-            "/v1/classify",
+            "/api/v1/classify",
             json={"name": "Slack", "description": "Team messaging and chat app"},
         )
 
