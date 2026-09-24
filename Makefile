@@ -12,4 +12,7 @@ types:
 test:
 	uv run pytest
 
+seed:
+	uv run python scripts/seed_catalog.py
+
 check: lint types test
