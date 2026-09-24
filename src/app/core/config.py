@@ -11,19 +11,22 @@ class DbSettings(BaseSettings):
 
     @property
     def url(self) -> str:
-        return (
-            f"postgresql+asyncpg://{self.USER}:{self.PASSWORD}"
-            f"@{self.HOST}:{self.PORT}/{self.NAME}?ssl={self.SSL_MODE}"
-        )
+        base = f"postgresql+asyncpg://{self.USER}:{self.PASSWORD}@{self.HOST}:{self.PORT}/{self.NAME}"
+        return f"{base}?ssl={self.SSL_MODE}"
+
+
+class AiSettings(BaseSettings):
+    OPENAI_API_KEY: str
+    CLASSIFICATION_MODEL: str = "gpt-4o-mini"
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="ignore")
 
-    openai_api_key: str
-    classification_model: str = "gpt-4o-mini"
-    logfire_token: str | None = None
-    db: DbSettings
+    LOGFIRE_TOKEN: str | None = None
+    DB: DbSettings
+    AI: AiSettings
 
 
 settings = Settings()
