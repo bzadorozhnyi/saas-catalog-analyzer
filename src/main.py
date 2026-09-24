@@ -5,7 +5,7 @@ from app.api.v1 import endpoints  # noqa: F401
 from app.api.v1.router import router as v1_router
 from app.core.config import settings
 
-logfire.configure(token=settings.logfire_token)
+logfire.configure(token=settings.LOGFIRE_TOKEN)
 logfire.instrument_pydantic_ai()
 
 app = FastAPI(title="SaaS Catalog Analyzer")

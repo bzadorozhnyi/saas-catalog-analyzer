@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(.env)",
+      "Read(**/.env)",
+      "Read(.env.local)",
+      "Read(**/.env.local)",
+      "Read(.env.development)",
+      "Read(**/.env.development)",
+      "Read(.env.development.local)",
+      "Read(**/.env.development.local)",
+      "Read(.env.production)",
+      "Read(**/.env.production)",
+      "Read(.env.production.local)",
+      "Read(**/.env.production.local)",
+      "Read(.env.test)",
+      "Read(**/.env.test)",
+      "Read(.env.test.local)",
+      "Read(**/.env.test.local)",
+      "Read(.env.staging)",
+      "Read(**/.env.staging)",
+      "Edit(.env)",
+      "Edit(**/.env)",
+      "Edit(.env.local)",
+      "Edit(**/.env.local)",
+      "Edit(.env.development)",
+      "Edit(**/.env.development)",
+      "Edit(.env.development.local)",
+      "Edit(**/.env.development.local)",
+      "Edit(.env.production)",
+      "Edit(**/.env.production)",
+      "Edit(.env.production.local)",
+      "Edit(**/.env.production.local)",
+      "Edit(.env.test)",
+      "Edit(**/.env.test)",
+      "Edit(.env.test.local)",
+      "Edit(**/.env.test.local)",
+      "Edit(.env.staging)",
+      "Edit(**/.env.staging)"
+    ],
+    "allow": [
+      "Read(.env.example)",
+      "Read(**/.env.example)",
+      "Edit(.env.example)",
+      "Edit(**/.env.example)"
+    ]
+  }
+}

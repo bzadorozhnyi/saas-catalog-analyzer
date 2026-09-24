@@ -7,8 +7,8 @@ from app.ai.schemas import ClassificationResult
 from app.core.config import settings
 
 classification_model = OpenAIChatModel(
-    settings.classification_model,
-    provider=OpenAIProvider(api_key=settings.openai_api_key),
+    settings.AI.CLASSIFICATION_MODEL,
+    provider=OpenAIProvider(api_key=settings.AI.OPENAI_API_KEY),
 )
 
 classification_agent: Agent[None, ClassificationResult] = Agent(
