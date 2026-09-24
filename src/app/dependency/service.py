@@ -7,6 +7,7 @@ from app.dependency.db import DbSessionDep
 from app.dependency.repository import CatalogRepositoryDep, EmbeddingCacheRepositoryDep
 from app.services.catalog_service import CatalogService
 from app.services.classification_service import ClassificationService
+from app.services.duplicate_detection_service import DuplicateDetectionService
 from app.services.embedding_service import EmbeddingService
 
 
@@ -31,3 +32,14 @@ def get_catalog_service(
 
 
 CatalogServiceDep = Annotated[CatalogService, Depends(get_catalog_service)]
+
+
+def get_duplicate_detection_service(
+    repository: CatalogRepositoryDep,
+) -> DuplicateDetectionService:
+    return DuplicateDetectionService(repository)
+
+
+DuplicateDetectionServiceDep = Annotated[
+    DuplicateDetectionService, Depends(get_duplicate_detection_service)
+]

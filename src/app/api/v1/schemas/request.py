@@ -12,3 +12,7 @@ class CreateCatalogItemRequest(BaseModel):
     name: str
     description: str
     category: SoftwareCategory
+
+
+class FindDuplicatesRequest(BaseModel):
+    subscription_names: list[str]

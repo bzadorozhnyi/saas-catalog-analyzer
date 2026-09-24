@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
 
 from app.models.category import SoftwareCategory
@@ -16,3 +18,10 @@ class CatalogItemResponse(BaseModel):
     name: str
     description: str
     category: SoftwareCategory
+
+
+class DuplicatePairResponse(BaseModel):
+    name_a: str
+    name_b: str
+    similarity: float
+    verdict: Literal["likely_duplicate", "review_manually"]

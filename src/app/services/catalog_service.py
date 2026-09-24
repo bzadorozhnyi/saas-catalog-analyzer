@@ -28,7 +28,7 @@ class CatalogService:
         return item
 
     async def list_items(self) -> list[SoftwareItem]:
-        return await self._repository.list()
+        return await self._repository.list_all()
 
     async def get_item(self, item_id: int) -> SoftwareItem | None:
         return await self._repository.get(item_id)
