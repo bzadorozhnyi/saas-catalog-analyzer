@@ -32,3 +32,7 @@ class CatalogRepository:
 
     async def get(self, item_id: int) -> SoftwareItem | None:
         return await self._session.get(SoftwareItem, item_id)
+
+    async def get_by_name(self, name: str) -> SoftwareItem | None:
+        result = await self._session.execute(select(SoftwareItem).where(SoftwareItem.name == name))
+        return result.scalar_one_or_none()
