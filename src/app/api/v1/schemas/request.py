@@ -16,3 +16,8 @@ class CreateCatalogItemRequest(BaseModel):
 
 class FindDuplicatesRequest(BaseModel):
     subscription_names: list[str]
+
+
+class ExplainDuplicateRequest(BaseModel):
+    name_a: str
+    name_b: str

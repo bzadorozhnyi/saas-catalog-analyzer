@@ -8,6 +8,7 @@ from app.dependency.repository import CatalogRepositoryDep, EmbeddingCacheReposi
 from app.services.catalog_service import CatalogService
 from app.services.classification_service import ClassificationService
 from app.services.duplicate_detection_service import DuplicateDetectionService
+from app.services.duplicate_explanation_service import DuplicateExplanationService
 from app.services.embedding_service import EmbeddingService
 
 
@@ -42,4 +43,15 @@ def get_duplicate_detection_service(
 
 DuplicateDetectionServiceDep = Annotated[
     DuplicateDetectionService, Depends(get_duplicate_detection_service)
+]
+
+
+def get_duplicate_explanation_service(
+    repository: CatalogRepositoryDep,
+) -> DuplicateExplanationService:
+    return DuplicateExplanationService(repository)
+
+
+DuplicateExplanationServiceDep = Annotated[
+    DuplicateExplanationService, Depends(get_duplicate_explanation_service)
 ]

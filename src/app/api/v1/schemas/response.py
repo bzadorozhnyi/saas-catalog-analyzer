@@ -25,3 +25,10 @@ class DuplicatePairResponse(BaseModel):
     name_b: str
     similarity: float
     verdict: Literal["likely_duplicate", "review_manually"]
+
+
+class ExplainDuplicateResponse(BaseModel):
+    is_duplicate: bool
+    confidence: float
+    reasoning: str
+    overlapping_features: list[str]
