@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.dto.catalog import SimilarPair
-from app.models.category import SoftwareCategory
+from app.enums.software_category_enum import SoftwareCategoryEnum
 from app.models.software_item import SoftwareItem
 
 
@@ -18,7 +18,7 @@ class CatalogRepository:
         self,
         name: str,
         description: str,
-        category: SoftwareCategory,
+        category: SoftwareCategoryEnum,
         embedding: list[float],
     ) -> SoftwareItem:
         item = SoftwareItem(
