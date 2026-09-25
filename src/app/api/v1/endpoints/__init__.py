@@ -4,5 +4,6 @@ from app.api.v1.endpoints import (  # noqa: F401
     explain_duplicate,
     find_duplicates,
     get_catalog_item,
+    get_request_status,
     list_catalog_items,
 )

@@ -2,17 +2,20 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from app.dependency.repository import RequestRepositoryDep
 from app.dependency.service import (
     CatalogServiceDep,
     ClassificationServiceDep,
     DuplicateDetectionServiceDep,
     DuplicateExplanationServiceDep,
+    RequestServiceDep,
 )
 from app.use_cases.classify_software import ClassifySoftwareUseCase
 from app.use_cases.create_catalog_item import CreateCatalogItemUseCase
 from app.use_cases.explain_duplicate import ExplainDuplicateUseCase
 from app.use_cases.find_duplicates import FindDuplicatesUseCase
 from app.use_cases.get_catalog_item import GetCatalogItemUseCase
+from app.use_cases.get_request_status import GetRequestStatusUseCase
 from app.use_cases.list_catalog_items import ListCatalogItemsUseCase
 
 
@@ -20,8 +23,14 @@ def get_classify_software_use_case(service: ClassificationServiceDep) -> Classif
     return ClassifySoftwareUseCase(service)
 
 
-def get_create_catalog_item_use_case(service: CatalogServiceDep) -> CreateCatalogItemUseCase:
+def get_create_catalog_item_use_case(service: RequestServiceDep) -> CreateCatalogItemUseCase:
     return CreateCatalogItemUseCase(service)
+
+
+def get_get_request_status_use_case(
+    repository: RequestRepositoryDep,
+) -> GetRequestStatusUseCase:
+    return GetRequestStatusUseCase(repository)
 
 
 def get_list_catalog_items_use_case(service: CatalogServiceDep) -> ListCatalogItemsUseCase:
@@ -61,4 +70,7 @@ FindDuplicatesUseCaseDep = Annotated[
 ]
 ExplainDuplicateUseCaseDep = Annotated[
     ExplainDuplicateUseCase, Depends(get_explain_duplicate_use_case)
+]
+GetRequestStatusUseCaseDep = Annotated[
+    GetRequestStatusUseCase, Depends(get_get_request_status_use_case)
 ]
