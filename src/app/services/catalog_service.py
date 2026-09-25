@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.category import SoftwareCategory
+from app.enums.software_category_enum import SoftwareCategoryEnum
 from app.models.software_item import SoftwareItem
 from app.repositories.catalog_repository import CatalogRepository
 from app.services.embedding_service import EmbeddingService
@@ -18,7 +18,7 @@ class CatalogService:
         self._embedding_service = embedding_service
 
     async def create_item(
-        self, name: str, description: str, category: SoftwareCategory
+        self, name: str, description: str, category: SoftwareCategoryEnum
     ) -> SoftwareItem:
         embedding = await self._embedding_service.get_embedding(f"{name}: {description}")
         item = await self._repository.create(

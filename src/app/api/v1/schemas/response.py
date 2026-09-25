@@ -2,11 +2,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models.category import SoftwareCategory
+from app.enums.software_category_enum import SoftwareCategoryEnum
 
 
 class ClassifyResponse(BaseModel):
-    category: SoftwareCategory
+    category: SoftwareCategoryEnum
     confidence: float
     reasoning: str
 
@@ -17,7 +17,7 @@ class CatalogItemResponse(BaseModel):
     id: int
     name: str
     description: str
-    category: SoftwareCategory
+    category: SoftwareCategoryEnum
 
 
 class DuplicatePairResponse(BaseModel):

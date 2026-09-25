@@ -1,7 +1,7 @@
 from enum import StrEnum
 
 
-class SoftwareCategory(StrEnum):
+class SoftwareCategoryEnum(StrEnum):
     COMMUNICATION = "Communication"
     PROJECT_MANAGEMENT = "Project Management"
     ACCOUNTING = "Accounting"

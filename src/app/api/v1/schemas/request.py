@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from app.models.category import SoftwareCategory
+from app.enums.software_category_enum import SoftwareCategoryEnum
 
 
 class ClassifyRequest(BaseModel):
@@ -11,7 +11,7 @@ class ClassifyRequest(BaseModel):
 class CreateCatalogItemRequest(BaseModel):
     name: str
     description: str
-    category: SoftwareCategory
+    category: SoftwareCategoryEnum
 
 
 class FindDuplicatesRequest(BaseModel):
