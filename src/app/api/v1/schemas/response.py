@@ -1,7 +1,9 @@
+import uuid
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from app.enums.request_status_enum import RequestStatusEnum
 from app.enums.software_category_enum import SoftwareCategoryEnum
 
 
@@ -18,6 +20,16 @@ class CatalogItemResponse(BaseModel):
     name: str
     description: str
     category: SoftwareCategoryEnum
+
+
+class CreateCatalogItemAcceptedResponse(BaseModel):
+    request_id: uuid.UUID
+
+
+class RequestStatusResponse(BaseModel):
+    request_id: uuid.UUID
+    status: RequestStatusEnum
+    result_item_id: int | None
 
 
 class DuplicatePairResponse(BaseModel):

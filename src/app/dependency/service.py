@@ -4,12 +4,18 @@ from fastapi import Depends
 
 from app.ai.embeddings import embedding_client
 from app.dependency.db import DbSessionDep
-from app.dependency.repository import CatalogRepositoryDep, EmbeddingCacheRepositoryDep
+from app.dependency.repository import (
+    CatalogRepositoryDep,
+    EmbeddingCacheRepositoryDep,
+    RequestAttemptRepositoryDep,
+    RequestRepositoryDep,
+)
 from app.services.catalog_service import CatalogService
 from app.services.classification_service import ClassificationService
 from app.services.duplicate_detection_service import DuplicateDetectionService
 from app.services.duplicate_explanation_service import DuplicateExplanationService
 from app.services.embedding_service import EmbeddingService
+from app.services.request_service import RequestService
 
 
 def get_classification_service() -> ClassificationService:
@@ -55,3 +61,14 @@ def get_duplicate_explanation_service(
 DuplicateExplanationServiceDep = Annotated[
     DuplicateExplanationService, Depends(get_duplicate_explanation_service)
 ]
+
+
+def get_request_service(
+    session: DbSessionDep,
+    request_repository: RequestRepositoryDep,
+    attempt_repository: RequestAttemptRepositoryDep,
+) -> RequestService:
+    return RequestService(session, request_repository, attempt_repository)
+
+
+RequestServiceDep = Annotated[RequestService, Depends(get_request_service)]
