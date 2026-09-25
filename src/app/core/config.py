@@ -27,6 +27,15 @@ class WorkerSettings(BaseSettings):
     HEARTBEAT_INTERVAL_SECONDS: int = 20
 
 
+class SqsSettings(BaseSettings):
+    QUEUE_NAME: str = "catalog-creation-queue"
+    ACCOUNT_ID: str = "000000000000"
+    REGION: str = "us-east-1"
+    ENDPOINT_URL: str | None = None
+    ACCESS_KEY_ID: str | None = None
+    SECRET_ACCESS_KEY: str | None = None
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="ignore")
 
@@ -34,6 +43,7 @@ class Settings(BaseSettings):
     DB: DbSettings
     AI: AiSettings
     WORKER: WorkerSettings = WorkerSettings()
+    SQS: SqsSettings = SqsSettings()
 
 
 settings = Settings()
