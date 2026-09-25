@@ -21,12 +21,19 @@ class AiSettings(BaseSettings):
     EMBEDDING_MODEL: str = "text-embedding-3-small"
 
 
+class WorkerSettings(BaseSettings):
+    MAX_ATTEMPTS: int = 3
+    LOCK_DURATION_SECONDS: int = 60
+    HEARTBEAT_INTERVAL_SECONDS: int = 20
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="ignore")
 
     LOGFIRE_TOKEN: str | None = None
     DB: DbSettings
     AI: AiSettings
+    WORKER: WorkerSettings = WorkerSettings()
 
 
 settings = Settings()
