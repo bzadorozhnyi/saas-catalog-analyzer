@@ -12,10 +12,12 @@ dependencies = [
     "alembic>=1.20.0",
     "asyncpg>=0.31.0",
     "fastapi>=0.141.1",
+    "limits[redis]>=5.8.0",
     "logfire[fastapi]>=5.1.0",
     "pgvector>=0.5.0",
     "pydantic-ai>=2.46.0",
     "pydantic-settings>=2.15.0",
+    "slowapi>=0.1.10",
     "sqlalchemy[asyncio]>=2.0.54",
     "uvicorn[standard]>=0.53.0",
 ]

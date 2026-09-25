@@ -6,7 +6,7 @@ from app.dependency.use_case import FindDuplicatesUseCaseDep
 
 @router.post("/find-duplicates")
 async def find_duplicates(
-    request: FindDuplicatesRequest,
+    payload: FindDuplicatesRequest,
     use_case: FindDuplicatesUseCaseDep,
     # Empirically calibrated on text-embedding-3-small over short SaaS product
     # descriptions: same-category pairs measured 0.588-0.812, different-category
@@ -14,4 +14,4 @@ async def find_duplicates(
     duplicate_threshold: float = 0.65,
     review_threshold: float = 0.55,
 ) -> list[DuplicatePairResponse]:
-    return await use_case.execute(request, duplicate_threshold, review_threshold)
+    return await use_case.execute(payload, duplicate_threshold, review_threshold)

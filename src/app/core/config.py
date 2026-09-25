@@ -36,6 +36,15 @@ class SqsSettings(BaseSettings):
     SECRET_ACCESS_KEY: str | None = None
 
 
+class RedisSettings(BaseSettings):
+    HOST: str = "localhost"
+    PORT: int = 6379
+
+    @property
+    def url(self) -> str:
+        return f"redis://{self.HOST}:{self.PORT}"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="ignore")
 
@@ -44,6 +53,7 @@ class Settings(BaseSettings):
     AI: AiSettings
     WORKER: WorkerSettings = WorkerSettings()
     SQS: SqsSettings = SqsSettings()
+    REDIS: RedisSettings = RedisSettings()
 
 
 settings = Settings()
