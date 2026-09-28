@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.dto.catalog import SimilarItem
 from app.enums.software_category_enum import SoftwareCategoryEnum
 from app.models.software_item import SoftwareItem
 from app.repositories.catalog_repository import CatalogRepository
@@ -32,3 +33,9 @@ class CatalogService:
 
     async def get_item(self, item_id: int) -> SoftwareItem | None:
         return await self._repository.get(item_id)
+
+    async def find_similar_items(self, item_id: int, limit: int) -> list[SimilarItem] | None:
+        item = await self._repository.get(item_id)
+        if item is None:
+            return None
+        return await self._repository.find_nearest(item.id, item.embedding, limit)
