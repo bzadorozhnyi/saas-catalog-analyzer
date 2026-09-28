@@ -32,6 +32,12 @@ class RequestStatusResponse(BaseModel):
     result_item_id: int | None
 
 
+class SimilarItemResponse(BaseModel):
+    item_id: int
+    name: str
+    similarity: float
+
+
 class DuplicatePairResponse(BaseModel):
     name_a: str
     name_b: str

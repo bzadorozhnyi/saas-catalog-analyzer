@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.dto.catalog import SimilarPair
+from app.dto.catalog import SimilarItem, SimilarPair
 from app.enums.software_category_enum import SoftwareCategoryEnum
 from app.models.software_item import SoftwareItem
 
@@ -72,3 +72,17 @@ class CatalogRepository:
         async with self._lock:
             result = await self._session.execute(stmt)
         return [SimilarPair(*row) for row in result.all()]
+
+    async def find_nearest(
+        self, exclude_id: int, embedding: list[float], limit: int
+    ) -> list[SimilarItem]:
+        distance = SoftwareItem.embedding.cosine_distance(embedding)
+        stmt = (
+            select(SoftwareItem.id, SoftwareItem.name, (1 - distance).label("similarity"))
+            .where(SoftwareItem.id != exclude_id)
+            .order_by(distance)
+            .limit(limit)
+        )
+        async with self._lock:
+            result = await self._session.execute(stmt)
+        return [SimilarItem(*row) for row in result.all()]
