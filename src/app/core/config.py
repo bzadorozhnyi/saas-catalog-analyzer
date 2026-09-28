@@ -29,6 +29,7 @@ class WorkerSettings(BaseSettings):
 
 class SqsSettings(BaseSettings):
     QUEUE_NAME: str = "catalog-creation-queue"
+    DLQ_NAME: str = "catalog-creation-dlq"
     ACCOUNT_ID: str = "000000000000"
     REGION: str = "us-east-1"
     ENDPOINT_URL: str | None = None

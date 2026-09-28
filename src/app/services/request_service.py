@@ -40,6 +40,23 @@ class RequestService:
     async def list_pending_for_dispatch(self, limit: int) -> list[Request]:
         return await self._request_repository.list_pending(limit)
 
+    async def get(self, request_id: uuid.UUID) -> Request | None:
+        return await self._request_repository.get(request_id)
+
+    async def manual_requeue(self, request_id: uuid.UUID) -> bool:
+        reset = await self._request_repository.reset_to_pending(request_id)
+        if reset:
+            try:
+                await self._session.commit()
+            except Exception:
+                logfire.exception(
+                    "Failed to commit manual requeue for request {request_id}",
+                    request_id=request_id,
+                )
+                await self._session.rollback()
+                raise
+        return reset
+
     async def mark_queued(self, request_id: uuid.UUID) -> bool:
         marked = await self._request_repository.mark_queued(request_id)
         try:

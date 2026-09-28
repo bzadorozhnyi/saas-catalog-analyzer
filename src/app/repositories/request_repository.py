@@ -94,6 +94,15 @@ class RequestRepository:
         result = cast(CursorResult, await self._session.execute(stmt))
         return result.rowcount == 1
 
+    async def reset_to_pending(self, request_id: uuid.UUID) -> bool:
+        stmt = (
+            update(Request)
+            .where(Request.id == request_id, Request.status == RequestStatusEnum.FAILED)
+            .values(status=RequestStatusEnum.PENDING, locked_by=None, locked_until=None)
+        )
+        result = cast(CursorResult, await self._session.execute(stmt))
+        return result.rowcount == 1
+
     async def retry_or_fail(self, request_id: uuid.UUID, worker_id: str, is_terminal: bool) -> bool:
         stmt = (
             update(Request)
