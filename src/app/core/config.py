@@ -27,14 +27,23 @@ class WorkerSettings(BaseSettings):
     HEARTBEAT_INTERVAL_SECONDS: int = 20
 
 
+class QueueSettings(BaseSettings):
+    QUEUE_NAME: str
+    DLQ_NAME: str
+
+
 class SqsSettings(BaseSettings):
-    QUEUE_NAME: str = "catalog-creation-queue"
-    DLQ_NAME: str = "catalog-creation-dlq"
     ACCOUNT_ID: str = "000000000000"
     REGION: str = "us-east-1"
     ENDPOINT_URL: str | None = None
     ACCESS_KEY_ID: str | None = None
     SECRET_ACCESS_KEY: str | None = None
+    CATALOG: QueueSettings = QueueSettings(
+        QUEUE_NAME="catalog-creation-queue", DLQ_NAME="catalog-creation-dlq"
+    )
+    REPORT: QueueSettings = QueueSettings(
+        QUEUE_NAME="report-generation-queue", DLQ_NAME="report-generation-dlq"
+    )
 
 
 class RedisSettings(BaseSettings):

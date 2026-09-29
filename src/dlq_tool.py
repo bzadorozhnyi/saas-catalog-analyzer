@@ -121,8 +121,10 @@ async def _handle_message(
 
 async def _redrive(*, apply: bool, force: bool, limit: int) -> None:
     configure_logfire()
-    main_queue_url = build_queue_url(settings.SQS.QUEUE_NAME, settings.SQS.ACCOUNT_ID)
-    dlq_url = build_queue_url(settings.SQS.DLQ_NAME, settings.SQS.ACCOUNT_ID)
+    # Only handles the catalog-creation queue/DLQ for now; report-generation
+    # redrive can reuse this once that consumer exists.
+    main_queue_url = build_queue_url(settings.SQS.CATALOG.QUEUE_NAME, settings.SQS.ACCOUNT_ID)
+    dlq_url = build_queue_url(settings.SQS.CATALOG.DLQ_NAME, settings.SQS.ACCOUNT_ID)
 
     counters: Counter[str] = Counter()
 

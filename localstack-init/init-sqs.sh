@@ -15,3 +15,4 @@ create_queue_with_dlq() {
 }
 
 create_queue_with_dlq catalog-creation-queue catalog-creation-dlq
+create_queue_with_dlq report-generation-queue report-generation-dlq

@@ -18,7 +18,7 @@ WORKER_ID = f"worker-{uuid.uuid4()}"
 async def main() -> None:
     configure_logfire()
     await llm_call_batcher.start()
-    queue_url = build_queue_url(settings.SQS.QUEUE_NAME, settings.SQS.ACCOUNT_ID)
+    queue_url = build_queue_url(settings.SQS.CATALOG.QUEUE_NAME, settings.SQS.ACCOUNT_ID)
 
     try:
         async with sqs_client() as client:
