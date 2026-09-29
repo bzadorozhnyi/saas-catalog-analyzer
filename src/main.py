@@ -10,6 +10,7 @@ from app.core.exception_handlers import exception_handler
 from app.core.llm_call_batcher import llm_call_batcher
 from app.core.observability import configure_logfire
 from app.core.rate_limiter import limiter, rate_limit_exceeded_handler
+from app.core.s3 import s3_client
 from router import router as api_router
 
 configure_logfire()
@@ -18,10 +19,12 @@ configure_logfire()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await llm_call_batcher.start()
-    try:
-        yield
-    finally:
-        await llm_call_batcher.stop()
+    async with s3_client() as client:
+        app.state.s3_client = client
+        try:
+            yield
+        finally:
+            await llm_call_batcher.stop()
 
 
 app = FastAPI(title="SaaS Catalog Analyzer", lifespan=lifespan)

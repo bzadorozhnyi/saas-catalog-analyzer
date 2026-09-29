@@ -26,6 +26,14 @@ class CreateCatalogItemAcceptedResponse(BaseModel):
     request_id: uuid.UUID
 
 
+class GenerateReportAcceptedResponse(BaseModel):
+    request_id: uuid.UUID
+
+
+class ReportUrlResponse(BaseModel):
+    url: str
+
+
 class RequestStatusResponse(BaseModel):
     request_id: uuid.UUID
     status: RequestStatusEnum

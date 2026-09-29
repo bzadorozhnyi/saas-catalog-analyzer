@@ -86,10 +86,26 @@ impl SqsSettings {
     }
 }
 
+fn default_bucket_name() -> String {
+    "report-documents".to_string()
+}
+
+#[derive(Debug, Deserialize)]
+pub struct S3Settings {
+    #[serde(default = "default_bucket_name")]
+    pub bucket_name: String,
+    #[serde(default = "default_region")]
+    pub region: String,
+    pub endpoint_url: Option<String>,
+    pub access_key_id: Option<String>,
+    pub secret_access_key: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Settings {
     pub db: DbSettings,
     pub sqs: SqsSettings,
+    pub s3: S3Settings,
 }
 
 impl Settings {

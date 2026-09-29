@@ -46,6 +46,14 @@ class SqsSettings(BaseSettings):
     )
 
 
+class S3Settings(BaseSettings):
+    BUCKET_NAME: str = "report-documents"
+    REGION: str = "us-east-1"
+    ENDPOINT_URL: str | None = None
+    ACCESS_KEY_ID: str | None = None
+    SECRET_ACCESS_KEY: str | None = None
+
+
 class RedisSettings(BaseSettings):
     HOST: str = "localhost"
     PORT: int = 6379
@@ -63,6 +71,7 @@ class Settings(BaseSettings):
     AI: AiSettings
     WORKER: WorkerSettings = WorkerSettings()
     SQS: SqsSettings = SqsSettings()
+    S3: S3Settings = S3Settings()
     REDIS: RedisSettings = RedisSettings()
 
 

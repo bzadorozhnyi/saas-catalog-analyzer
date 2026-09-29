@@ -8,6 +8,7 @@ from app.dependency.service import (
     ClassificationServiceDep,
     DuplicateDetectionServiceDep,
     DuplicateExplanationServiceDep,
+    ReportServiceDep,
     RequestServiceDep,
 )
 from app.use_cases.classify_software import ClassifySoftwareUseCase
@@ -15,7 +16,9 @@ from app.use_cases.create_catalog_item import CreateCatalogItemUseCase
 from app.use_cases.explain_duplicate import ExplainDuplicateUseCase
 from app.use_cases.find_duplicates import FindDuplicatesUseCase
 from app.use_cases.find_similar_items import FindSimilarItemsUseCase
+from app.use_cases.generate_report import GenerateReportUseCase
 from app.use_cases.get_catalog_item import GetCatalogItemUseCase
+from app.use_cases.get_report_url import GetReportUrlUseCase
 from app.use_cases.get_request_status import GetRequestStatusUseCase
 from app.use_cases.list_catalog_items import ListCatalogItemsUseCase
 
@@ -52,6 +55,14 @@ def get_find_similar_items_use_case(service: CatalogServiceDep) -> FindSimilarIt
     return FindSimilarItemsUseCase(service)
 
 
+def get_generate_report_use_case(service: RequestServiceDep) -> GenerateReportUseCase:
+    return GenerateReportUseCase(service)
+
+
+def get_get_report_url_use_case(service: ReportServiceDep) -> GetReportUrlUseCase:
+    return GetReportUrlUseCase(service)
+
+
 def get_explain_duplicate_use_case(
     service: DuplicateExplanationServiceDep,
 ) -> ExplainDuplicateUseCase:
@@ -81,4 +92,10 @@ ExplainDuplicateUseCaseDep = Annotated[
 ]
 GetRequestStatusUseCaseDep = Annotated[
     GetRequestStatusUseCase, Depends(get_get_request_status_use_case)
+]
+GenerateReportUseCaseDep = Annotated[
+    GenerateReportUseCase, Depends(get_generate_report_use_case)
+]
+GetReportUrlUseCaseDep = Annotated[
+    GetReportUrlUseCase, Depends(get_get_report_url_use_case)
 ]
