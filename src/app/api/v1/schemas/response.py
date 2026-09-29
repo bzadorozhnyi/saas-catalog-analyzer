@@ -39,6 +39,7 @@ class SimilarItemResponse(BaseModel):
 
 
 class DuplicatePairResponse(BaseModel):
+    id: uuid.UUID
     name_a: str
     name_b: str
     similarity: float
