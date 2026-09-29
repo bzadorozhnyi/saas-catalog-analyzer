@@ -1,3 +1,5 @@
+import uuid
+
 from pydantic import BaseModel
 
 
@@ -16,5 +18,4 @@ class FindDuplicatesRequest(BaseModel):
 
 
 class ExplainDuplicateRequest(BaseModel):
-    name_a: str
-    name_b: str
+    pair_id: uuid.UUID

@@ -6,6 +6,7 @@ from app.ai.embeddings import embedding_client
 from app.dependency.db import DbSessionDep
 from app.dependency.repository import (
     CatalogRepositoryDep,
+    DuplicateRepositoryDep,
     EmbeddingCacheRepositoryDep,
     RequestAttemptRepositoryDep,
     RequestRepositoryDep,
@@ -42,9 +43,11 @@ CatalogServiceDep = Annotated[CatalogService, Depends(get_catalog_service)]
 
 
 def get_duplicate_detection_service(
-    repository: CatalogRepositoryDep,
+    session: DbSessionDep,
+    catalog_repository: CatalogRepositoryDep,
+    duplicate_repository: DuplicateRepositoryDep,
 ) -> DuplicateDetectionService:
-    return DuplicateDetectionService(repository)
+    return DuplicateDetectionService(session, catalog_repository, duplicate_repository)
 
 
 DuplicateDetectionServiceDep = Annotated[
@@ -53,9 +56,11 @@ DuplicateDetectionServiceDep = Annotated[
 
 
 def get_duplicate_explanation_service(
-    repository: CatalogRepositoryDep,
+    session: DbSessionDep,
+    catalog_repository: CatalogRepositoryDep,
+    duplicate_repository: DuplicateRepositoryDep,
 ) -> DuplicateExplanationService:
-    return DuplicateExplanationService(repository)
+    return DuplicateExplanationService(session, catalog_repository, duplicate_repository)
 
 
 DuplicateExplanationServiceDep = Annotated[

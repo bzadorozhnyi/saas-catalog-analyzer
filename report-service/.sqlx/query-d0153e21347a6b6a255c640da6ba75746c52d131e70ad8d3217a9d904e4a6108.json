@@ -1,0 +1,119 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id,\n                name_a,\n                name_b,\n                similarity,\n                verdict::text AS \"verdict!\",\n                is_duplicate,\n                confidence,\n                reasoning,\n                overlapping_features\n            FROM duplicate_pairs\n            WHERE check_id = $1\n            ORDER BY similarity DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "duplicate_pairs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name_a",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "duplicate_pairs",
+            "name": "name_a"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "name_b",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "duplicate_pairs",
+            "name": "name_b"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "similarity",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "duplicate_pairs",
+            "name": "similarity"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "verdict!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "is_duplicate",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "duplicate_pairs",
+            "name": "is_duplicate"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "confidence",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "duplicate_pairs",
+            "name": "confidence"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "reasoning",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "duplicate_pairs",
+            "name": "reasoning"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "overlapping_features",
+        "type_info": "VarcharArray",
+        "origin": {
+          "Table": {
+            "table": "duplicate_pairs",
+            "name": "overlapping_features"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "d0153e21347a6b6a255c640da6ba75746c52d131e70ad8d3217a9d904e4a6108"
+}

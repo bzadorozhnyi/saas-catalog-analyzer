@@ -1,26 +1,43 @@
 import time
+import uuid
+
+import logfire
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.agents import explain_duplicate_agent
 from app.ai.schemas import ExplainDuplicateResult
 from app.core.config import settings
+from app.core.exceptions import NotFoundException
 from app.core.llm_call_batcher import log_llm_call
 from app.enums.llm_call_purpose_enum import LlmCallPurposeEnum
 from app.enums.llm_call_status_enum import LlmCallStatusEnum
 from app.repositories.catalog_repository import CatalogRepository
+from app.repositories.duplicate_repository import DuplicateRepository
 
 
 class DuplicateExplanationService:
-    def __init__(self, repository: CatalogRepository) -> None:
-        self._repository = repository
+    def __init__(
+        self,
+        session: AsyncSession,
+        catalog_repository: CatalogRepository,
+        duplicate_repository: DuplicateRepository,
+    ) -> None:
+        self._session = session
+        self._catalog_repository = catalog_repository
+        self._duplicate_repository = duplicate_repository
 
-    async def explain(self, name_a: str, name_b: str) -> ExplainDuplicateResult:
+    async def explain(self, pair_id: uuid.UUID) -> ExplainDuplicateResult:
+        pair = await self._duplicate_repository.get(pair_id)
+        if pair is None:
+            raise NotFoundException(msg=f"Duplicate pair {pair_id} not found")
+
         prompt = (
-            f"Are '{name_a}' and '{name_b}' duplicate SaaS subscriptions? "
+            f"Are '{pair.name_a}' and '{pair.name_b}' duplicate SaaS subscriptions? "
             "Look up both in the catalog before answering."
         )
         started_at = time.monotonic()
         try:
-            run_result = await explain_duplicate_agent.run(prompt, deps=self._repository)
+            run_result = await explain_duplicate_agent.run(prompt, deps=self._catalog_repository)
         except Exception:
             log_llm_call(
                 purpose=LlmCallPurposeEnum.EXPLAIN_DUPLICATE,
@@ -41,4 +58,20 @@ class DuplicateExplanationService:
             latency_ms=int((time.monotonic() - started_at) * 1000),
             status=LlmCallStatusEnum.SUCCESS,
         )
-        return run_result.output
+
+        result = run_result.output
+        await self._duplicate_repository.update_explanation(
+            pair_id,
+            result.is_duplicate,
+            result.confidence,
+            result.reasoning,
+            result.overlapping_features,
+        )
+        try:
+            await self._session.commit()
+        except Exception:
+            logfire.exception("Failed to commit explanation for pair {pair_id}", pair_id=pair_id)
+            await self._session.rollback()
+            raise
+
+        return result
