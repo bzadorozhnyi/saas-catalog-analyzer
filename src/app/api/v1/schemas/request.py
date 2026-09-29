@@ -19,3 +19,7 @@ class FindDuplicatesRequest(BaseModel):
 
 class ExplainDuplicateRequest(BaseModel):
     pair_id: uuid.UUID
+
+
+class GenerateReportRequest(BaseModel):
+    check_id: uuid.UUID

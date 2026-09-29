@@ -18,7 +18,7 @@ services:
   localstack:
     image: localstack/localstack:3
     environment:
-      SERVICES: sqs
+      SERVICES: sqs,s3
     ports:
       - "4566:4566"
     volumes:

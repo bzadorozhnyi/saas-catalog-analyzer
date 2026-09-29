@@ -1,3 +1,4 @@
+pub mod aws_clients;
 pub mod consumers;
 pub mod dto;
 pub mod enums;
