@@ -1,0 +1,113 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE requests\n            SET status = 'PROCESSING', locked_by = $2, locked_until = $3\n            WHERE id = $1\n              AND (status = 'QUEUED' OR (status = 'PROCESSING' AND locked_until < now()))\n            RETURNING\n                id,\n                request_type AS \"request_type: RequestType\",\n                status AS \"status: RequestStatus\",\n                payload,\n                locked_by,\n                locked_until\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "requests",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "request_type: RequestType",
+        "type_info": {
+          "Custom": {
+            "name": "requesttypeenum",
+            "kind": {
+              "Enum": [
+                "CATALOG_CREATION",
+                "GENERATE_REPORT"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "requests",
+            "name": "request_type"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "status: RequestStatus",
+        "type_info": {
+          "Custom": {
+            "name": "requeststatusenum",
+            "kind": {
+              "Enum": [
+                "PENDING",
+                "QUEUED",
+                "PROCESSING",
+                "COMPLETED",
+                "FAILED"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "requests",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "payload",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "requests",
+            "name": "payload"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "locked_by",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "requests",
+            "name": "locked_by"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "locked_until",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "requests",
+            "name": "locked_until"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "1b0d79f5bfe6d455912fdd4ed7a75bc12337481ffd599c7fd24410549acef1e1"
+}
