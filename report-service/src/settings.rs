@@ -101,11 +101,38 @@ pub struct S3Settings {
     pub secret_access_key: Option<String>,
 }
 
+fn default_lock_duration_seconds() -> i64 {
+    60
+}
+
+fn default_heartbeat_interval_seconds() -> i64 {
+    20
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WorkerSettings {
+    #[serde(default = "default_lock_duration_seconds")]
+    pub lock_duration_seconds: i64,
+    #[serde(default = "default_heartbeat_interval_seconds")]
+    pub heartbeat_interval_seconds: i64,
+}
+
+impl Default for WorkerSettings {
+    fn default() -> Self {
+        Self {
+            lock_duration_seconds: default_lock_duration_seconds(),
+            heartbeat_interval_seconds: default_heartbeat_interval_seconds(),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Settings {
     pub db: DbSettings,
     pub sqs: SqsSettings,
     pub s3: S3Settings,
+    #[serde(default)]
+    pub worker: WorkerSettings,
 }
 
 impl Settings {

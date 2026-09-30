@@ -58,6 +58,8 @@ async fn main() -> anyhow::Result<()> {
         reporting_context,
         TypstRenderer::new(),
         worker_id,
+        settings.worker.lock_duration_seconds,
+        settings.worker.heartbeat_interval_seconds,
     );
 
     info!(

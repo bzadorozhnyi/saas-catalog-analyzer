@@ -22,3 +22,10 @@ class SQSService:
 
     async def delete_message(self, receipt_handle: str) -> None:
         await self._client.delete_message(QueueUrl=self._queue_url, ReceiptHandle=receipt_handle)
+
+    async def change_message_visibility(self, receipt_handle: str, visibility_timeout: int) -> None:
+        await self._client.change_message_visibility(
+            QueueUrl=self._queue_url,
+            ReceiptHandle=receipt_handle,
+            VisibilityTimeout=visibility_timeout,
+        )
