@@ -272,7 +272,7 @@ impl ReportGenerationConsumer {
             .renderer
             .render(template_text, render_request.data_json)?;
 
-        let blob_name = format!("{report_kind}/{report_version}/{}.pdf", request.id);
+        let blob_name = format!("{report_kind}/{report_version}/{}.pdf", attempt.id);
         self.s3_service
             .upload(&blob_name, pdf_bytes, ContentType::Pdf)
             .await?;
