@@ -1,10 +1,13 @@
 use aws_sdk_sqs::types::Message;
 use chrono::Duration;
 use serde_json::Value;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
+use crate::dto::request::Request;
+use crate::dto::request_attempt::RequestAttempt;
 use crate::enums::content_type_enum::ContentType;
+use crate::errors::reporting_error::ReportingError;
 use crate::rendering::typst_renderer::TypstRenderer;
 use crate::reporting::context::ReportingContext;
 use crate::reporting::registry::build_report;
@@ -23,6 +26,7 @@ pub struct ReportGenerationConsumer {
     reporting_context: ReportingContext,
     renderer: TypstRenderer,
     worker_id: String,
+    max_attempts: i32,
 }
 
 impl ReportGenerationConsumer {
@@ -36,6 +40,7 @@ impl ReportGenerationConsumer {
         reporting_context: ReportingContext,
         renderer: TypstRenderer,
         worker_id: String,
+        max_attempts: i32,
     ) -> Self {
         Self {
             sqs_service,
@@ -45,6 +50,7 @@ impl ReportGenerationConsumer {
             reporting_context,
             renderer,
             worker_id,
+            max_attempts,
         }
     }
 
@@ -62,11 +68,14 @@ impl ReportGenerationConsumer {
     }
 
     /// Malformed bodies and lost claims are handled here (logged, message
-    /// deleted). A `claim()` failure (e.g. Postgres unreachable) and any
-    /// failure while building/rendering/storing the report propagate instead
-    /// — the message is left undeleted for SQS redelivery (eventually
-    /// landing in the DLQ after `maxReceiveCount`), mirroring
-    /// `CatalogCreationConsumer._handle_message` on the Python side. Unlike
+    /// deleted). Once a request is claimed, retries are driven entirely by
+    /// `requests.status` (`PENDING` picked up again by the dispatcher, or
+    /// `FAILED` for good) — not by SQS's own redelivery — so the message is
+    /// deleted after every recorded outcome, success or failure alike. The
+    /// message is left undeleted only if we could not even persist the
+    /// failure (e.g. Postgres unreachable), mirroring
+    /// `CatalogCreationConsumer._handle_message` /
+    /// `CatalogCreationWorkerService.process` on the Python side. Unlike
     /// Python's `asyncio.gather`-based batch (which cancels sibling messages
     /// on the first error), messages here are handled one at a time, so a
     /// failure on one does not abort the rest of the batch.
@@ -94,11 +103,31 @@ impl ReportGenerationConsumer {
             )
             .await?;
 
-        let Some(request) = claimed else {
+        let Some((request, attempt)) = claimed else {
             self.delete_or_log(&receipt_handle).await;
             return Ok(());
         };
 
+        if let Err(error) = self.execute_attempt(&request, &attempt).await {
+            error!(%error, %request_id, "attempt failed");
+            if let Err(fail_error) = self.fail_attempt(&request, &attempt, &error).await {
+                error!(%fail_error, %request_id, "could not record failure, leaving for redelivery");
+                return Err(fail_error);
+            }
+        }
+
+        self.delete_or_log(&receipt_handle).await;
+        Ok(())
+    }
+
+    /// Runs the full happy path: parse payload, build + render the report,
+    /// upload it, and mark the request completed. Mirrors
+    /// `CatalogCreationWorkerService._execute_attempt` on the Python side.
+    async fn execute_attempt(
+        &self,
+        request: &Request,
+        attempt: &RequestAttempt,
+    ) -> anyhow::Result<()> {
         let (report_kind, report_version, check_id) = Self::parse_report_payload(&request.payload)?;
 
         let render_request = build_report(
@@ -114,26 +143,60 @@ impl ReportGenerationConsumer {
             .renderer
             .render(template_text, render_request.data_json)?;
 
-        let blob_name = format!("{report_kind}/{report_version}/{request_id}.pdf");
+        let blob_name = format!("{report_kind}/{report_version}/{}", request.id);
         self.s3_service
             .upload(&blob_name, pdf_bytes, ContentType::Pdf)
             .await?;
         let report_document = self
             .report_document_repository
-            .create(request_id, &blob_name)
+            .create(request.id, &blob_name)
             .await?;
 
-        match self
+        let success_message = format!("generated report document {}", report_document.id);
+        let completed = self
             .request_service
-            .complete(request_id, &self.worker_id, Some(report_document.id))
-            .await
-        {
-            Ok(true) => info!(%request_id, "report request completed"),
-            Ok(false) => error!(%request_id, "complete() lost the lock before finishing"),
-            Err(error) => error!(%error, %request_id, "complete() failed"),
+            .complete(
+                request.id,
+                &self.worker_id,
+                attempt.id,
+                Some(report_document.id),
+                &success_message,
+            )
+            .await?;
+        if completed {
+            info!(request_id = %request.id, "report request completed");
+        } else {
+            // Another worker already took over — nothing left for us to do.
+            warn!(request_id = %request.id, "lost claim on request, another worker took over");
         }
+        Ok(())
+    }
 
-        self.delete_or_log(&receipt_handle).await;
+    /// Classifies a failed attempt — permanent (via `ReportingError`) or
+    /// attempts-exhausted means `FAILED` for good; otherwise back to
+    /// `PENDING` for the dispatcher to retry. Mirrors
+    /// `CatalogCreationWorkerService._handle_failure` on the Python side.
+    /// Returns `Err` only if recording the failure itself failed.
+    async fn fail_attempt(
+        &self,
+        request: &Request,
+        attempt: &RequestAttempt,
+        error: &anyhow::Error,
+    ) -> anyhow::Result<()> {
+        let is_permanent = error
+            .downcast_ref::<ReportingError>()
+            .is_some_and(|error| !error.is_retryable());
+        let is_terminal = is_permanent || attempt.attempt_number >= self.max_attempts;
+
+        self.request_service
+            .fail(
+                request.id,
+                &self.worker_id,
+                attempt.id,
+                &error.to_string(),
+                is_terminal,
+            )
+            .await?;
         Ok(())
     }
 
@@ -159,22 +222,23 @@ impl ReportGenerationConsumer {
     /// Parses the `GENERATE_REPORT` request payload built by
     /// `GenerateReportUseCase` on the Python side: `{report_kind,
     /// report_version, check_id}`.
-    fn parse_report_payload(payload: &Value) -> anyhow::Result<(String, String, Uuid)> {
+    fn parse_report_payload(payload: &Value) -> Result<(String, String, Uuid), ReportingError> {
         let report_kind = payload
             .get("report_kind")
             .and_then(Value::as_str)
-            .ok_or_else(|| anyhow::anyhow!("payload missing report_kind"))?
+            .ok_or_else(|| ReportingError::InvalidPayload("missing report_kind".to_string()))?
             .to_string();
         let report_version = payload
             .get("report_version")
             .and_then(Value::as_str)
-            .ok_or_else(|| anyhow::anyhow!("payload missing report_version"))?
+            .ok_or_else(|| ReportingError::InvalidPayload("missing report_version".to_string()))?
             .to_string();
         let check_id_str = payload
             .get("check_id")
             .and_then(Value::as_str)
-            .ok_or_else(|| anyhow::anyhow!("payload missing check_id"))?;
-        let check_id = Uuid::parse_str(check_id_str)?;
+            .ok_or_else(|| ReportingError::InvalidPayload("missing check_id".to_string()))?;
+        let check_id = Uuid::parse_str(check_id_str)
+            .map_err(|error| ReportingError::InvalidPayload(error.to_string()))?;
         Ok((report_kind, report_version, check_id))
     }
 }

@@ -2,6 +2,7 @@ pub mod aws_clients;
 pub mod consumers;
 pub mod dto;
 pub mod enums;
+pub mod errors;
 pub mod rendering;
 pub mod reporting;
 pub mod repositories;

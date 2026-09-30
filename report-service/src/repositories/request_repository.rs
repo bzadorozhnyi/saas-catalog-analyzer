@@ -1,26 +1,23 @@
 use chrono::Utc;
-use sqlx::PgPool;
+use sqlx::PgExecutor;
 use uuid::Uuid;
 
 use crate::dto::request::Request;
 use crate::enums::request_status_enum::RequestStatus;
 use crate::enums::request_type_enum::RequestType;
 
-pub struct RequestRepository {
-    pool: PgPool,
-}
+/// Every method takes its executor as a parameter instead of holding a
+/// `PgPool` — see `RequestAttemptRepository` for why: `RequestService`
+/// always composes these calls with the attempt-tracking repository in one
+/// transaction.
+pub struct RequestRepository;
 
 impl RequestRepository {
-    #[must_use]
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
     /// Atomically claims a request: succeeds only when the row is `QUEUED`,
     /// or `PROCESSING` with an expired lock (a worker that died mid-attempt).
     /// Mirrors `RequestRepository.claim()` on the Python side exactly.
     pub async fn claim(
-        &self,
+        executor: impl PgExecutor<'_>,
         request_id: Uuid,
         worker_id: &str,
         lock_duration: chrono::Duration,
@@ -45,14 +42,14 @@ impl RequestRepository {
             worker_id,
             locked_until,
         )
-        .fetch_optional(&self.pool)
+        .fetch_optional(executor)
         .await
     }
 
     /// Marks a claimed request completed. Only succeeds while `worker_id`
     /// still holds the lock (guards against a lock lost to another worker).
     pub async fn complete(
-        &self,
+        executor: impl PgExecutor<'_>,
         request_id: Uuid,
         worker_id: &str,
         result_item_id: Option<i32>,
@@ -67,7 +64,7 @@ impl RequestRepository {
             worker_id,
             result_item_id,
         )
-        .execute(&self.pool)
+        .execute(executor)
         .await?;
         Ok(result.rows_affected() == 1)
     }
@@ -75,7 +72,7 @@ impl RequestRepository {
     /// Releases a claimed request back to `PENDING` for another dispatch
     /// cycle, or marks it `FAILED` when `is_terminal` (attempts exhausted).
     pub async fn retry_or_fail(
-        &self,
+        executor: impl PgExecutor<'_>,
         request_id: Uuid,
         worker_id: &str,
         is_terminal: bool,
@@ -95,7 +92,7 @@ impl RequestRepository {
             worker_id,
             status as RequestStatus,
         )
-        .execute(&self.pool)
+        .execute(executor)
         .await?;
         Ok(result.rows_affected() == 1)
     }

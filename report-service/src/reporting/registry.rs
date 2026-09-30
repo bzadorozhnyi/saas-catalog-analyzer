@@ -1,5 +1,6 @@
 use uuid::Uuid;
 
+use crate::errors::reporting_error::ReportingError;
 use crate::reporting::context::ReportingContext;
 use crate::reporting::duplicate_report;
 
@@ -18,7 +19,7 @@ pub async fn build_report(
     kind: &str,
     version: &str,
     check_id: Uuid,
-) -> anyhow::Result<RenderRequest> {
+) -> Result<RenderRequest, ReportingError> {
     match (kind, version) {
         ("duplicate_detection", "v1") => {
             let data = duplicate_report::v1::build(context, check_id).await?;
@@ -27,6 +28,9 @@ pub async fn build_report(
                 data_json: serde_json::to_vec(&data)?,
             })
         }
-        _ => anyhow::bail!("unknown report kind/version: {kind}/{version}"),
+        _ => Err(ReportingError::UnknownReportKind {
+            kind: kind.to_string(),
+            version: version.to_string(),
+        }),
     }
 }
