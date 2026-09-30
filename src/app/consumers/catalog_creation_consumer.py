@@ -12,7 +12,10 @@ from app.repositories.catalog_repository import CatalogRepository
 from app.repositories.embedding_cache_repository import EmbeddingCacheRepository
 from app.repositories.request_attempt_repository import RequestAttemptRepository
 from app.repositories.request_repository import RequestRepository
-from app.services.catalog_creation_worker_service import CatalogCreationWorkerService
+from app.services.catalog_creation_worker_service import (
+    AttemptOutcome,
+    CatalogCreationWorkerService,
+)
 from app.services.classification_service import ClassificationService
 from app.services.embedding_service import EmbeddingService
 from app.services.request_service import RequestService
@@ -63,7 +66,7 @@ class CatalogCreationConsumer:
 
             heartbeat_task = asyncio.create_task(self._heartbeat(request_id))
             try:
-                await worker_service.process(request, attempt)
+                outcome = await worker_service.process(request, attempt)
             except Exception:
                 # process() only re-raises when it could not even persist the
                 # failure (e.g. DB unreachable) — leave the message for redelivery.
@@ -71,6 +74,13 @@ class CatalogCreationConsumer:
                 return
             finally:
                 heartbeat_task.cancel()
+
+        if outcome == AttemptOutcome.FAILED:
+            # Recorded as FAILED, but not terminal — leave the message alone
+            # so SQS's own redelivery (and eventually its RedrivePolicy) can
+            # give it another try, rather than us re-implementing a retry
+            # counter that has to be kept in sync with SQS's.
+            return
 
         await self._sqs_service.delete_message(receipt_handle)
 

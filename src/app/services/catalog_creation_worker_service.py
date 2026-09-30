@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 import logfire
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,6 +10,20 @@ from app.repositories.catalog_repository import CatalogRepository
 from app.services.classification_service import ClassificationService
 from app.services.embedding_service import EmbeddingService
 from app.services.request_service import RequestClaimLostError, RequestService
+
+
+class AttemptOutcome(StrEnum):
+    """Tells the consumer whether to delete the SQS message.
+
+    SUCCEEDED / CLAIM_LOST -> delete; there's nothing more for this
+    delivery to do. FAILED -> leave the message alone. SQS's own
+    redelivery (and eventually its RedrivePolicy/DLQ) decides what
+    happens next, not this service.
+    """
+
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    CLAIM_LOST = "CLAIM_LOST"
 
 
 class CatalogCreationWorkerService:
@@ -27,7 +43,7 @@ class CatalogCreationWorkerService:
         self._embedding_service = embedding_service
         self._worker_id = worker_id
 
-    async def process(self, request: Request, attempt: RequestAttempt) -> None:
+    async def process(self, request: Request, attempt: RequestAttempt) -> AttemptOutcome:
         try:
             await self._execute_attempt(request, attempt)
         except RequestClaimLostError:
@@ -36,10 +52,12 @@ class CatalogCreationWorkerService:
                 "Lost claim on request {request_id}, another worker took over",
                 request_id=request.id,
             )
+            return AttemptOutcome.CLAIM_LOST
         except Exception as error:
             logfire.exception("Attempt failed for request {request_id}", request_id=request.id)
             await self._session.rollback()
-            await self._handle_failure(request, attempt, str(error))
+            return await self._handle_failure(request, attempt, str(error))
+        return AttemptOutcome.SUCCEEDED
 
     async def _execute_attempt(self, request: Request, attempt: RequestAttempt) -> None:
         payload = CatalogCreationPayload.model_validate(request.payload)
@@ -67,7 +85,7 @@ class CatalogCreationWorkerService:
 
     async def _handle_failure(
         self, request: Request, attempt: RequestAttempt, error_message: str
-    ) -> None:
+    ) -> AttemptOutcome:
         try:
             await self._request_service.fail(
                 request_id=request.id,
@@ -82,9 +100,11 @@ class CatalogCreationWorkerService:
                 "Lost claim on request {request_id} while recording failure",
                 request_id=request.id,
             )
+            return AttemptOutcome.CLAIM_LOST
         except Exception:
             logfire.exception(
                 "Could not record failure for request {request_id} — DB may be unreachable",
                 request_id=request.id,
             )
             raise
+        return AttemptOutcome.FAILED

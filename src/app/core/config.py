@@ -22,7 +22,10 @@ class AiSettings(BaseSettings):
 
 
 class WorkerSettings(BaseSettings):
-    MAX_ATTEMPTS: int = 3
+    # No MAX_ATTEMPTS here — SQS's own RedrivePolicy (maxReceiveCount, see
+    # localstack-init/init-sqs.sh) is the sole retry-limit authority. FAILED
+    # requests aren't terminal; whether they get another attempt is decided
+    # by SQS redelivery or a manual DLQ redrive, not by this app.
     LOCK_DURATION_SECONDS: int = 60
     HEARTBEAT_INTERVAL_SECONDS: int = 20
 

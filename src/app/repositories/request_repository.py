@@ -45,12 +45,19 @@ class RequestRepository:
     async def claim(
         self, request_id: uuid.UUID, worker_id: str, lock_duration: timedelta
     ) -> Request | None:
+        # FAILED is claimable too — it isn't terminal. It means the last
+        # attempt didn't work out; SQS's own redelivery (or a manual DLQ
+        # redrive, which never touches this table) drives the next try.
+        # FAILED rows have no active lock (fail() clears locked_by), so —
+        # unlike the PROCESSING branch — there's no need to wait out a
+        # lock: nothing is currently working on them.
         stmt = (
             update(Request)
             .where(
                 Request.id == request_id,
                 or_(
                     Request.status == RequestStatusEnum.QUEUED,
+                    Request.status == RequestStatusEnum.FAILED,
                     (Request.status == RequestStatusEnum.PROCESSING)
                     & (Request.locked_until < func.now()),
                 ),
@@ -94,24 +101,14 @@ class RequestRepository:
         result = cast(CursorResult, await self._session.execute(stmt))
         return result.rowcount == 1
 
-    async def reset_to_pending(self, request_id: uuid.UUID) -> bool:
-        stmt = (
-            update(Request)
-            .where(Request.id == request_id, Request.status == RequestStatusEnum.FAILED)
-            .values(status=RequestStatusEnum.PENDING, locked_by=None, locked_until=None)
-        )
-        result = cast(CursorResult, await self._session.execute(stmt))
-        return result.rowcount == 1
-
-    async def retry_or_fail(self, request_id: uuid.UUID, worker_id: str, is_terminal: bool) -> bool:
+    async def fail(self, request_id: uuid.UUID, worker_id: str) -> bool:
+        # Not terminal — see claim(). Whether this request gets another
+        # attempt is entirely up to SQS (redelivery) or a manual DLQ
+        # redrive; neither touches this table.
         stmt = (
             update(Request)
             .where(Request.id == request_id, Request.locked_by == worker_id)
-            .values(
-                status=RequestStatusEnum.FAILED if is_terminal else RequestStatusEnum.PENDING,
-                locked_by=None,
-                locked_until=None,
-            )
+            .values(status=RequestStatusEnum.FAILED, locked_by=None, locked_until=None)
         )
         result = cast(CursorResult, await self._session.execute(stmt))
         return result.rowcount == 1
