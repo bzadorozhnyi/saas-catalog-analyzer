@@ -42,6 +42,100 @@ services:
       timeout: 3s
       retries: 5
 
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: alembic upgrade head
+    env_file: .env
+    environment:
+      DB__HOST: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: uvicorn main:app --app-dir src --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      DB__HOST: postgres
+      SQS__ENDPOINT_URL: http://localstack:4566
+      S3__ENDPOINT_URL: http://localstack:4566
+      REDIS__HOST: redis
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  dispatcher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m src.dispatcher
+    env_file: .env
+    environment:
+      DB__HOST: postgres
+      SQS__ENDPOINT_URL: http://localstack:4566
+      S3__ENDPOINT_URL: http://localstack:4566
+      REDIS__HOST: redis
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    restart: unless-stopped
+
+  catalog-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m src.worker
+    env_file: .env
+    environment:
+      DB__HOST: postgres
+      SQS__ENDPOINT_URL: http://localstack:4566
+      S3__ENDPOINT_URL: http://localstack:4566
+      REDIS__HOST: redis
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    restart: unless-stopped
+
+  report-service:
+    build:
+      context: ./report-service
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      DB__HOST: postgres
+      SQS__ENDPOINT_URL: http://localstack:4566
+      S3__ENDPOINT_URL: http://localstack:4566
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   localstack_data:

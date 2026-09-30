@@ -19,6 +19,7 @@ dependencies = [
     "pydantic-settings>=2.15.0",
     "slowapi>=0.1.10",
     "sqlalchemy[asyncio]>=2.0.54",
+    "typer>=0.27.2",
     "uvicorn[standard]>=0.53.0",
 ]
 
@@ -45,5 +46,4 @@ dev = [
     "pytest-asyncio>=1.4.0",
     "ruff>=0.16.8",
     "ty>=0.0.82",
-    "typer>=0.27.2",
 ]
