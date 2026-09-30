@@ -43,20 +43,6 @@ class RequestService:
     async def get(self, request_id: uuid.UUID) -> Request | None:
         return await self._request_repository.get(request_id)
 
-    async def manual_requeue(self, request_id: uuid.UUID) -> bool:
-        reset = await self._request_repository.reset_to_pending(request_id)
-        if reset:
-            try:
-                await self._session.commit()
-            except Exception:
-                logfire.exception(
-                    "Failed to commit manual requeue for request {request_id}",
-                    request_id=request_id,
-                )
-                await self._session.rollback()
-                raise
-        return reset
-
     async def mark_queued(self, request_id: uuid.UUID) -> bool:
         marked = await self._request_repository.mark_queued(request_id)
         try:
@@ -127,9 +113,10 @@ class RequestService:
         error_message: str,
         trace_id: str | None,
     ) -> None:
-        attempt_count = await self._attempt_repository.count_for_request(request_id)
-        is_terminal = attempt_count >= settings.WORKER.MAX_ATTEMPTS
-        updated = await self._request_repository.retry_or_fail(request_id, worker_id, is_terminal)
+        # Not terminal — see RequestRepository.claim()/fail(). How many more
+        # times this gets tried is SQS's call (redelivery + RedrivePolicy),
+        # not ours; we just record what happened.
+        updated = await self._request_repository.fail(request_id, worker_id)
         if not updated:
             raise RequestClaimLostError(
                 f"Lock for request {request_id} was lost before failure handling"
