@@ -23,3 +23,4 @@ class ExplainDuplicateRequest(BaseModel):
 
 class GenerateReportRequest(BaseModel):
     check_id: uuid.UUID
+    report_version: str = "v1"

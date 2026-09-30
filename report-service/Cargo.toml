@@ -27,6 +27,7 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 typst = "0.15.1"
 typst-assets = { version = "0.15.1", features = ["fonts"] }
+typst-kit = { version = "0.15.1", features = ["system-packages", "system-downloader"] }
 typst-layout = "0.15.1"
 typst-pdf = "0.15.1"
 uuid = { version = "1.26.1", features = ["v4", "serde"] }

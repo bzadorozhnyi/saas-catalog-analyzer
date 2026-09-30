@@ -28,6 +28,13 @@ pub async fn build_report(
                 data_json: serde_json::to_vec(&data)?,
             })
         }
+        ("duplicate_detection", "v2") => {
+            let data = duplicate_report::v2::build(context, check_id).await?;
+            Ok(RenderRequest {
+                template_path: "duplicate_report_v2.typ",
+                data_json: serde_json::to_vec(&data)?,
+            })
+        }
         _ => Err(ReportingError::UnknownReportKind {
             kind: kind.to_string(),
             version: version.to_string(),

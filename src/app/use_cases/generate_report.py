@@ -15,7 +15,7 @@ class GenerateReportUseCase:
                 # Must match a (kind, version) arm in report-service's
                 # reporting::registry::build_report.
                 "report_kind": "duplicate_detection",
-                "report_version": "v1",
+                "report_version": request.report_version,
                 "check_id": str(request.check_id),
             },
         )
