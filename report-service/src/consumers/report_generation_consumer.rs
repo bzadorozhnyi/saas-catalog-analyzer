@@ -26,7 +26,6 @@ pub struct ReportGenerationConsumer {
     reporting_context: ReportingContext,
     renderer: TypstRenderer,
     worker_id: String,
-    max_attempts: i32,
 }
 
 impl ReportGenerationConsumer {
@@ -40,7 +39,6 @@ impl ReportGenerationConsumer {
         reporting_context: ReportingContext,
         renderer: TypstRenderer,
         worker_id: String,
-        max_attempts: i32,
     ) -> Self {
         Self {
             sqs_service,
@@ -50,7 +48,6 @@ impl ReportGenerationConsumer {
             reporting_context,
             renderer,
             worker_id,
-            max_attempts,
         }
     }
 
@@ -68,12 +65,16 @@ impl ReportGenerationConsumer {
     }
 
     /// Malformed bodies and lost claims are handled here (logged, message
-    /// deleted). Once a request is claimed, retries are driven entirely by
-    /// `requests.status` (`PENDING` picked up again by the dispatcher, or
-    /// `FAILED` for good) — not by SQS's own redelivery — so the message is
-    /// deleted after every recorded outcome, success or failure alike. The
-    /// message is left undeleted only if we could not even persist the
-    /// failure (e.g. Postgres unreachable), mirroring
+    /// deleted). Once a request is claimed, `FAILED` is not terminal — SQS's
+    /// own redelivery (and eventually its RedrivePolicy/DLQ) drives further
+    /// attempts, not a Python/Rust-side counter, so the message is left
+    /// alone on a retryable failure rather than deleted. The one exception:
+    /// a `ReportingError` we can already prove is permanent (bad
+    /// `check_id`, unknown report kind, malformed payload) — retrying can
+    /// never help, so we delete the message immediately instead of waiting
+    /// out SQS's redelivery cycle for nothing; the request stays `FAILED`
+    /// and claimable regardless. The message is left undeleted if we could
+    /// not even persist the failure (e.g. Postgres unreachable), mirroring
     /// `CatalogCreationConsumer._handle_message` /
     /// `CatalogCreationWorkerService.process` on the Python side. Unlike
     /// Python's `asyncio.gather`-based batch (which cancels sibling messages
@@ -110,10 +111,23 @@ impl ReportGenerationConsumer {
 
         if let Err(error) = self.execute_attempt(&request, &attempt).await {
             error!(%error, %request_id, "attempt failed");
+
+            let is_permanent = error
+                .downcast_ref::<ReportingError>()
+                .is_some_and(|error| !error.is_retryable());
+
             if let Err(fail_error) = self.fail_attempt(&request, &attempt, &error).await {
                 error!(%fail_error, %request_id, "could not record failure, leaving for redelivery");
                 return Err(fail_error);
             }
+
+            if !is_permanent {
+                // Leave the message alone — SQS's own redelivery decides
+                // whether this gets another try, not us.
+                return Ok(());
+            }
+            // Known-permanent: no point waiting out SQS's redelivery cycle
+            // for something that can never succeed — delete now.
         }
 
         self.delete_or_log(&receipt_handle).await;
@@ -172,9 +186,7 @@ impl ReportGenerationConsumer {
         Ok(())
     }
 
-    /// Classifies a failed attempt — permanent (via `ReportingError`) or
-    /// attempts-exhausted means `FAILED` for good; otherwise back to
-    /// `PENDING` for the dispatcher to retry. Mirrors
+    /// Records a failed attempt. Mirrors
     /// `CatalogCreationWorkerService._handle_failure` on the Python side.
     /// Returns `Err` only if recording the failure itself failed.
     async fn fail_attempt(
@@ -183,19 +195,8 @@ impl ReportGenerationConsumer {
         attempt: &RequestAttempt,
         error: &anyhow::Error,
     ) -> anyhow::Result<()> {
-        let is_permanent = error
-            .downcast_ref::<ReportingError>()
-            .is_some_and(|error| !error.is_retryable());
-        let is_terminal = is_permanent || attempt.attempt_number >= self.max_attempts;
-
         self.request_service
-            .fail(
-                request.id,
-                &self.worker_id,
-                attempt.id,
-                &error.to_string(),
-                is_terminal,
-            )
+            .fail(request.id, &self.worker_id, attempt.id, &error.to_string())
             .await?;
         Ok(())
     }

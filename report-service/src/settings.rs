@@ -101,31 +101,11 @@ pub struct S3Settings {
     pub secret_access_key: Option<String>,
 }
 
-fn default_max_attempts() -> i32 {
-    3
-}
-
-#[derive(Debug, Deserialize)]
-pub struct WorkerSettings {
-    #[serde(default = "default_max_attempts")]
-    pub max_attempts: i32,
-}
-
-impl Default for WorkerSettings {
-    fn default() -> Self {
-        Self {
-            max_attempts: default_max_attempts(),
-        }
-    }
-}
-
 #[derive(Debug, Deserialize)]
 pub struct Settings {
     pub db: DbSettings,
     pub sqs: SqsSettings,
     pub s3: S3Settings,
-    #[serde(default)]
-    pub worker: WorkerSettings,
 }
 
 impl Settings {

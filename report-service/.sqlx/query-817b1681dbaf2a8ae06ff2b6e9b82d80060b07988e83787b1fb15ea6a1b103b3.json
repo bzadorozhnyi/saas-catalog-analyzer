@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            UPDATE requests\n            SET status = 'PROCESSING', locked_by = $2, locked_until = $3\n            WHERE id = $1\n              AND (status = 'QUEUED' OR (status = 'PROCESSING' AND locked_until < now()))\n            RETURNING\n                id,\n                request_type AS \"request_type: RequestType\",\n                status AS \"status: RequestStatus\",\n                payload,\n                locked_by,\n                locked_until\n            ",
+  "query": "\n            UPDATE requests\n            SET status = 'PROCESSING', locked_by = $2, locked_until = $3\n            WHERE id = $1\n              AND (\n                status = 'QUEUED'\n                OR status = 'FAILED'\n                OR (status = 'PROCESSING' AND locked_until < now())\n              )\n            RETURNING\n                id,\n                request_type AS \"request_type: RequestType\",\n                status AS \"status: RequestStatus\",\n                payload,\n                locked_by,\n                locked_until\n            ",
   "describe": {
     "columns": [
       {
@@ -109,5 +109,5 @@
       true
     ]
   },
-  "hash": "1b0d79f5bfe6d455912fdd4ed7a75bc12337481ffd599c7fd24410549acef1e1"
+  "hash": "817b1681dbaf2a8ae06ff2b6e9b82d80060b07988e83787b1fb15ea6a1b103b3"
 }

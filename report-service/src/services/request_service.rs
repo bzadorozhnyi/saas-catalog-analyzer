@@ -70,21 +70,19 @@ impl RequestService {
         Ok(completed)
     }
 
-    /// Fails a claimed request. `is_terminal = true` marks it `FAILED`
-    /// (unrecoverable — no point redelivering); `false` releases it back to
-    /// `PENDING` for another dispatch cycle.
+    /// Not terminal — see `RequestRepository::claim()`/`fail()`. How many
+    /// more times this gets tried is SQS's call (redelivery +
+    /// `RedrivePolicy`), not ours; we just record what happened.
     pub async fn fail(
         &self,
         request_id: Uuid,
         worker_id: &str,
         attempt_id: Uuid,
         error_message: &str,
-        is_terminal: bool,
     ) -> sqlx::Result<bool> {
         let mut tx = self.pool.begin().await?;
 
-        let updated =
-            RequestRepository::retry_or_fail(&mut *tx, request_id, worker_id, is_terminal).await?;
+        let updated = RequestRepository::fail(&mut *tx, request_id, worker_id).await?;
         if updated {
             RequestAttemptRepository::fail(&mut *tx, attempt_id, error_message).await?;
         }

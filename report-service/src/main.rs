@@ -58,7 +58,6 @@ async fn main() -> anyhow::Result<()> {
         reporting_context,
         TypstRenderer::new(),
         worker_id,
-        settings.worker.max_attempts,
     );
 
     info!(
