@@ -1,6 +1,10 @@
 use aws_sdk_sqs::types::Message;
 use serde_json::Value;
 
+/// `Clone` is cheap (`aws_sdk_sqs::Client` is `Arc`-backed internally) — the
+/// heartbeat task in `ReportGenerationConsumer` clones this to extend the
+/// SQS visibility timeout from its own `tokio::spawn`ed future.
+#[derive(Clone)]
 pub struct SqsService {
     client: aws_sdk_sqs::Client,
     queue_url: String,
@@ -43,6 +47,21 @@ impl SqsService {
             .delete_message()
             .queue_url(&self.queue_url)
             .receipt_handle(receipt_handle)
+            .send()
+            .await?;
+        Ok(())
+    }
+
+    pub async fn change_message_visibility(
+        &self,
+        receipt_handle: &str,
+        visibility_timeout_seconds: i32,
+    ) -> Result<(), aws_sdk_sqs::Error> {
+        self.client
+            .change_message_visibility()
+            .queue_url(&self.queue_url)
+            .receipt_handle(receipt_handle)
+            .visibility_timeout(visibility_timeout_seconds)
             .send()
             .await?;
         Ok(())

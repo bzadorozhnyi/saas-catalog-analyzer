@@ -64,7 +64,7 @@ class CatalogCreationConsumer:
                 worker_id=self._worker_id,
             )
 
-            heartbeat_task = asyncio.create_task(self._heartbeat(request_id))
+            heartbeat_task = asyncio.create_task(self._heartbeat(request_id, receipt_handle))
             try:
                 outcome = await worker_service.process(request, attempt)
             except Exception:
@@ -84,20 +84,49 @@ class CatalogCreationConsumer:
 
         await self._sqs_service.delete_message(receipt_handle)
 
-    async def _heartbeat(self, request_id: uuid.UUID) -> None:
+    async def _heartbeat(self, request_id: uuid.UUID, receipt_handle: str) -> None:
         lock_duration = timedelta(seconds=settings.WORKER.LOCK_DURATION_SECONDS)
         try:
             while True:
                 await asyncio.sleep(settings.WORKER.HEARTBEAT_INTERVAL_SECONDS)
-                async with async_session_factory() as session:
-                    extended = await RequestRepository(session).extend_lock(
-                        request_id, self._worker_id, lock_duration
+
+                # DB and SQS failures are handled independently and per-tick
+                # (not via one exception handler around the whole loop) so a
+                # single transient error self-heals on the next tick instead
+                # of silently ending the heartbeat for the rest of the
+                # attempt. Only an explicit "lock already lost" from the DB
+                # is a real reason to stop — everything else is ambiguous
+                # (could be a network blip), and the DB's own
+                # `WHERE locked_by = worker_id` check on completion is the
+                # actual correctness backstop regardless of what heartbeat
+                # does here.
+                try:
+                    async with async_session_factory() as session:
+                        extended = await RequestRepository(session).extend_lock(
+                            request_id, self._worker_id, lock_duration
+                        )
+                        await session.commit()
+                except Exception:
+                    logfire.exception(
+                        "Heartbeat failed to extend DB lock for request {request_id}, "
+                        "will retry next tick",
+                        request_id=request_id,
                     )
-                    await session.commit()
+                    continue
+
                 if not extended:
                     # Lock already lost to another worker; nothing left to extend.
                     return
+
+                try:
+                    await self._sqs_service.change_message_visibility(
+                        receipt_handle, settings.WORKER.LOCK_DURATION_SECONDS
+                    )
+                except Exception:
+                    logfire.exception(
+                        "Heartbeat failed to extend SQS visibility timeout for request "
+                        "{request_id}, will retry next tick",
+                        request_id=request_id,
+                    )
         except asyncio.CancelledError:
             pass
-        except Exception:
-            logfire.exception("Heartbeat failed for request {request_id}", request_id=request_id)

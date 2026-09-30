@@ -11,7 +11,10 @@ use crate::repositories::request_repository::RequestRepository;
 /// transaction per operation — a claim and its attempt row (or a
 /// completion/failure and its attempt row) must commit or roll back
 /// together, the same guarantee `RequestService` gives on the Python side
-/// via a shared `AsyncSession`.
+/// via a shared `AsyncSession`. `Clone` is cheap (`PgPool` is `Arc`-backed
+/// internally) — the heartbeat task in `ReportGenerationConsumer` clones
+/// this to run on its own `tokio::spawn`ed future.
+#[derive(Clone)]
 pub struct RequestService {
     pool: PgPool,
 }
@@ -50,6 +53,19 @@ impl RequestService {
         Ok(Some((request, attempt)))
     }
 
+    /// Standalone query — no attempt-table involvement, so it runs directly
+    /// against the pool rather than in a transaction (matching
+    /// `RequestRepository.extend_lock()`'s single-statement commit on the
+    /// Python side).
+    pub async fn extend_lock(
+        &self,
+        request_id: Uuid,
+        worker_id: &str,
+        lock_duration: Duration,
+    ) -> sqlx::Result<bool> {
+        RequestRepository::extend_lock(&self.pool, request_id, worker_id, lock_duration).await
+    }
+
     pub async fn complete(
         &self,
         request_id: Uuid,
@@ -70,21 +86,19 @@ impl RequestService {
         Ok(completed)
     }
 
-    /// Fails a claimed request. `is_terminal = true` marks it `FAILED`
-    /// (unrecoverable — no point redelivering); `false` releases it back to
-    /// `PENDING` for another dispatch cycle.
+    /// Not terminal — see `RequestRepository::claim()`/`fail()`. How many
+    /// more times this gets tried is SQS's call (redelivery +
+    /// `RedrivePolicy`), not ours; we just record what happened.
     pub async fn fail(
         &self,
         request_id: Uuid,
         worker_id: &str,
         attempt_id: Uuid,
         error_message: &str,
-        is_terminal: bool,
     ) -> sqlx::Result<bool> {
         let mut tx = self.pool.begin().await?;
 
-        let updated =
-            RequestRepository::retry_or_fail(&mut *tx, request_id, worker_id, is_terminal).await?;
+        let updated = RequestRepository::fail(&mut *tx, request_id, worker_id).await?;
         if updated {
             RequestAttemptRepository::fail(&mut *tx, attempt_id, error_message).await?;
         }
