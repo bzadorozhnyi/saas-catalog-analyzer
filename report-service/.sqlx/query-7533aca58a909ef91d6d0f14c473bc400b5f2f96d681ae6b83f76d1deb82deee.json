@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE request_attempts\n            SET status = 'SUCCEEDED', success_message = $2, finished_at = now()\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7533aca58a909ef91d6d0f14c473bc400b5f2f96d681ae6b83f76d1deb82deee"
+}

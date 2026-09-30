@@ -4,7 +4,6 @@ use report_service::rendering::typst_renderer::TypstRenderer;
 use report_service::reporting::context::ReportingContext;
 use report_service::repositories::duplicate_repository::DuplicateRepository;
 use report_service::repositories::report_document_repository::ReportDocumentRepository;
-use report_service::repositories::request_repository::RequestRepository;
 use report_service::services::request_service::RequestService;
 use report_service::services::s3_service::S3Service;
 use report_service::services::sqs_service::SqsService;
@@ -45,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
 
     let sqs_service = SqsService::new(sqs_client, settings.sqs.queue_url());
     let s3_service = S3Service::new(s3_client, settings.s3.bucket_name.clone());
-    let request_service = RequestService::new(RequestRepository::new(pool.clone()));
+    let request_service = RequestService::new(pool.clone());
     let report_document_repository = ReportDocumentRepository::new(pool.clone());
     let reporting_context = ReportingContext {
         duplicate_repository: DuplicateRepository::new(pool),
@@ -59,6 +58,7 @@ async fn main() -> anyhow::Result<()> {
         reporting_context,
         TypstRenderer::new(),
         worker_id,
+        settings.worker.max_attempts,
     );
 
     info!(

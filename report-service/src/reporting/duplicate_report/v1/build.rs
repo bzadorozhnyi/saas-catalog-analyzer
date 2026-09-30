@@ -1,18 +1,22 @@
 use uuid::Uuid;
 
+use crate::errors::reporting_error::ReportingError;
 use crate::reporting::context::ReportingContext;
 use crate::reporting::duplicate_report::v1::dto::{PairData, ReportData};
 
 /// Builds the report payload straight from already-persisted data — no LLM
 /// calls, no dependency on the Python side. Everything needed was written by
 /// `find_duplicates`/`explain_duplicate` at the time those were called.
-pub async fn build(context: &ReportingContext, check_id: Uuid) -> anyhow::Result<ReportData> {
+pub async fn build(
+    context: &ReportingContext,
+    check_id: Uuid,
+) -> Result<ReportData, ReportingError> {
     let repository = &context.duplicate_repository;
 
     let check = repository
         .get_check(check_id)
         .await?
-        .ok_or_else(|| anyhow::anyhow!("duplicate check {check_id} not found"))?;
+        .ok_or(ReportingError::CheckNotFound(check_id))?;
     let pairs = repository.list_pairs(check_id).await?;
 
     Ok(ReportData {
