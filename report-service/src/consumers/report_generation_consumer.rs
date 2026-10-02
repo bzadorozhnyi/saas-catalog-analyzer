@@ -14,7 +14,7 @@ use crate::rendering::typst_renderer::TypstRenderer;
 use crate::reporting::context::ReportingContext;
 use crate::reporting::registry::build_report;
 use crate::repositories::report_document_repository::ReportDocumentRepository;
-use crate::services::request_service::RequestService;
+use crate::services::request_service::{RequestClaim, RequestService};
 use crate::services::s3_service::S3Service;
 use crate::services::sqs_service::SqsService;
 
@@ -131,14 +131,23 @@ impl ReportGenerationConsumer {
             }
         };
 
-        let claimed = self
+        let (request, attempt) = match self
             .request_service
             .claim(request_id, &self.worker_id, self.lock_duration)
-            .await?;
-
-        let Some((request, attempt)) = claimed else {
-            self.delete_or_log(&receipt_handle).await;
-            return Ok(());
+            .await?
+        {
+            RequestClaim::Claimed(request, attempt) => (request, attempt),
+            RequestClaim::NotYetQueued => {
+                // The dispatcher's SQS send and its `mark_queued` commit
+                // aren't one atomic operation — this message beat the
+                // status update to QUEUED. Not a duplicate: leave it for
+                // SQS's own redelivery instead of deleting it.
+                return Ok(());
+            }
+            RequestClaim::Unclaimable => {
+                self.delete_or_log(&receipt_handle).await;
+                return Ok(());
+            }
         };
 
         // Keeps the lock alive past `lock_duration` while a slow attempt

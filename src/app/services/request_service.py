@@ -1,10 +1,12 @@
 import uuid
 from datetime import timedelta
+from enum import StrEnum
 
 import logfire
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.enums.request_status_enum import RequestStatusEnum
 from app.enums.request_type_enum import RequestTypeEnum
 from app.models.request import Request
 from app.models.request_attempt import RequestAttempt
@@ -14,6 +16,27 @@ from app.repositories.request_repository import RequestRepository
 
 class RequestClaimLostError(Exception):
     """Raised when another worker took over the lock before this worker could persist its result."""
+
+
+class ClaimOutcome(StrEnum):
+    """What the caller should do about the SQS message when `claim()`
+    doesn't return a claimed `(Request, RequestAttempt)` pair.
+
+    "Not claimed" used to mean one thing to callers (safe to delete the SQS
+    message) — it actually covers two different situations:
+
+    NOT_YET_QUEUED: the row is still PENDING. The dispatcher's SQS send and
+    its mark_queued commit aren't one atomic operation, so a message can
+    legitimately arrive before the row is actually claimable yet. Not a
+    duplicate — leave the message alone for SQS's own redelivery.
+
+    UNCLAIMABLE: the row doesn't exist, is already COMPLETED, or is
+    PROCESSING under another worker's still-live lock — nothing further is
+    needed from this message; safe to delete.
+    """
+
+    NOT_YET_QUEUED = "NOT_YET_QUEUED"
+    UNCLAIMABLE = "UNCLAIMABLE"
 
 
 class RequestService:
@@ -57,11 +80,44 @@ class RequestService:
 
     async def claim(
         self, request_id: uuid.UUID, worker_id: str
-    ) -> tuple[Request, RequestAttempt] | None:
+    ) -> tuple[Request, RequestAttempt] | ClaimOutcome:
         lock_duration = timedelta(seconds=settings.WORKER.LOCK_DURATION_SECONDS)
         request = await self._request_repository.claim(request_id, worker_id, lock_duration)
+
         if request is None:
-            return None
+            # Lock the row so nothing (dispatcher's mark_queued, another
+            # worker's complete()/fail()) can change it while we work out
+            # why the attempt above missed, then decide — or retry right
+            # there — against an accurate, race-free snapshot.
+            status = await self._request_repository.get_status_for_update(request_id)
+            if status in (
+                RequestStatusEnum.QUEUED,
+                RequestStatusEnum.FAILED,
+                RequestStatusEnum.PROCESSING,
+            ):
+                # Became claimable (or its lock expired) in the gap above —
+                # still holding the row lock, so this is guaranteed to see
+                # the same state just read.
+                request = await self._request_repository.claim(
+                    request_id, worker_id, lock_duration
+                )
+
+            if request is None:
+                outcome = (
+                    ClaimOutcome.NOT_YET_QUEUED
+                    if status == RequestStatusEnum.PENDING
+                    else ClaimOutcome.UNCLAIMABLE
+                )
+                try:
+                    await self._session.commit()  # releases the FOR UPDATE row lock
+                except Exception:
+                    logfire.exception(
+                        "Failed to release claim lock for request {request_id}",
+                        request_id=request_id,
+                    )
+                    await self._session.rollback()
+                    raise
+                return outcome
 
         attempt_number = await self._attempt_repository.count_for_request(request_id) + 1
         attempt = await self._attempt_repository.start(request_id, attempt_number)

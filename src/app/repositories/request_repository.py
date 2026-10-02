@@ -29,6 +29,18 @@ class RequestRepository:
     async def get(self, request_id: uuid.UUID) -> Request | None:
         return await self._session.get(Request, request_id)
 
+    async def get_status_for_update(
+        self, request_id: uuid.UUID
+    ) -> RequestStatusEnum | None:
+        # FOR UPDATE: called only after claim() misses, to find out *why* —
+        # locks the row so nothing else (dispatcher's mark_queued, another
+        # worker's complete()/fail()) can change it while we decide, so the
+        # status we classify against can never be a stale snapshot racing
+        # against one of those writers. See RequestService.claim().
+        stmt = select(Request.status).where(Request.id == request_id).with_for_update()
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def list_pending(self, limit: int) -> list[Request]:
         stmt = (
             select(Request)
