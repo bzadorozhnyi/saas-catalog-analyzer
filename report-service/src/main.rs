@@ -2,6 +2,7 @@ use report_service::aws_clients::{build_s3_client, build_sqs_client};
 use report_service::consumers::report_generation_consumer::ReportGenerationConsumer;
 use report_service::observability::init_tracing;
 use report_service::rendering::typst_renderer::TypstRenderer;
+use report_service::rendering::warmup::warm_up;
 use report_service::reporting::context::ReportingContext;
 use report_service::repositories::duplicate_repository::DuplicateRepository;
 use report_service::repositories::report_document_repository::ReportDocumentRepository;
@@ -47,6 +48,9 @@ async fn main() -> anyhow::Result<()> {
     let reporting_context = ReportingContext {
         duplicate_repository: DuplicateRepository::new(pool),
     };
+    let renderer = TypstRenderer::new();
+    warm_up(&renderer, "templates");
+
     let worker_id = format!("report-worker-{}", Uuid::new_v4());
     let consumer = ReportGenerationConsumer::new(
         sqs_service,
@@ -54,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
         report_document_repository,
         s3_service,
         reporting_context,
-        TypstRenderer::new(),
+        renderer,
         worker_id,
         settings.worker.lock_duration_seconds,
         settings.worker.heartbeat_interval_seconds,
