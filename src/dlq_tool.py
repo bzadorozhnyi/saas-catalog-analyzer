@@ -22,6 +22,18 @@ from app.services.sqs_service import SQSService
 app = typer.Typer()
 
 
+class QueueChoice(StrEnum):
+    CATALOG = "catalog"
+    REPORT = "report"
+    ALL = "all"
+
+
+_QUEUES: dict[QueueChoice, tuple[str, str]] = {
+    QueueChoice.CATALOG: (settings.SQS.CATALOG.QUEUE_NAME, settings.SQS.CATALOG.DLQ_NAME),
+    QueueChoice.REPORT: (settings.SQS.REPORT.QUEUE_NAME, settings.SQS.REPORT.DLQ_NAME),
+}
+
+
 class Decision(StrEnum):
     REDRIVE = "redrive"
     SKIP_IN_FLIGHT = "skip_in_flight"
@@ -108,12 +120,11 @@ async def _handle_message(
     return decision
 
 
-async def _redrive(*, apply: bool, limit: int) -> None:
-    configure_logfire()
-    # Only handles the catalog-creation queue/DLQ for now; report-generation
-    # redrive can reuse this once that consumer exists.
-    main_queue_url = build_queue_url(settings.SQS.CATALOG.QUEUE_NAME, settings.SQS.ACCOUNT_ID)
-    dlq_url = build_queue_url(settings.SQS.CATALOG.DLQ_NAME, settings.SQS.ACCOUNT_ID)
+async def _redrive_one_queue(
+    label: QueueChoice, queue_name: str, dlq_name: str, *, apply: bool, limit: int
+) -> Counter[str]:
+    main_queue_url = build_queue_url(queue_name, settings.SQS.ACCOUNT_ID)
+    dlq_url = build_queue_url(dlq_name, settings.SQS.ACCOUNT_ID)
 
     counters: Counter[str] = Counter()
 
@@ -127,8 +138,12 @@ async def _redrive(*, apply: bool, limit: int) -> None:
                     max_messages=min(10, limit - counters.total()), wait_seconds=1
                 )
             except Exception:
-                logfire.exception("Failed to receive messages from DLQ, stopping this run")
-                typer.echo("Could not reach SQS, stopping. See logs for details.", err=True)
+                logfire.exception(
+                    "Failed to receive messages from {label} DLQ, stopping this run", label=label
+                )
+                typer.echo(
+                    f"[{label}] Could not reach SQS, stopping. See logs for details.", err=True
+                )
                 break
 
             if not messages:
@@ -138,19 +153,39 @@ async def _redrive(*, apply: bool, limit: int) -> None:
                 try:
                     decision = await _handle_message(message, main_queue, dlq, apply=apply)
                 except Exception:
-                    logfire.exception("Failed to handle a DLQ message")
-                    typer.echo("  error handling this message, see logs; continuing", err=True)
+                    logfire.exception("Failed to handle a DLQ message in {label}", label=label)
+                    typer.echo(
+                        f"[{label}]   error handling this message, see logs; continuing", err=True
+                    )
                     counters["errors"] += 1
                     continue
 
                 counters["skipped" if decision in _SKIP_DECISIONS else "succeeded"] += 1
 
+    return counters
+
+
+async def _redrive(*, queue: QueueChoice, apply: bool, limit: int) -> None:
+    configure_logfire()
+
+    queues = _QUEUES if queue == QueueChoice.ALL else {queue: _QUEUES[queue]}
+
+    total: Counter[str] = Counter()
+    for label, (queue_name, dlq_name) in queues.items():
+        typer.echo(f"=== {label} ===")
+        counters = await _redrive_one_queue(label, queue_name, dlq_name, apply=apply, limit=limit)
+        total.update(counters)
+        typer.echo(
+            f"[{label}] {counters['succeeded']} succeeded, "
+            f"{counters['skipped']} skipped, {counters['errors']} errors"
+        )
+
     mode = "applied" if apply else "dry-run, use --apply to act"
     typer.echo(
-        f"Done ({mode}): {counters['succeeded']} succeeded, "
-        f"{counters['skipped']} skipped, {counters['errors']} errors"
+        f"Done ({mode}): {total['succeeded']} succeeded, "
+        f"{total['skipped']} skipped, {total['errors']} errors"
     )
-    if counters["errors"]:
+    if total["errors"]:
         typer.echo(
             "Some messages failed to process — check logs, fix the issue, and rerun.", err=True
         )
@@ -158,12 +193,20 @@ async def _redrive(*, apply: bool, limit: int) -> None:
 
 @app.command()
 def redrive(
+    queue: QueueChoice = typer.Option(  # noqa: B008 — typer's own required pattern; bugbear's
+        # call-in-default exemption only covers builtin-typed Options (bool/int/str), not Enums.
+        "all",
+        "--queue",
+        help="Which DLQ to redrive: catalog, report, or all.",
+    ),
     apply: bool = typer.Option(
         False, "--apply", help="Actually perform changes; without it, only prints decisions."
     ),
-    limit: int = typer.Option(50, "--limit", help="Max DLQ messages to process in this run."),
+    limit: int = typer.Option(
+        50, "--limit", help="Max DLQ messages to process per queue in this run."
+    ),
 ) -> None:
-    asyncio.run(_redrive(apply=apply, limit=limit))
+    asyncio.run(_redrive(queue=queue, apply=apply, limit=limit))
 
 
 if __name__ == "__main__":
