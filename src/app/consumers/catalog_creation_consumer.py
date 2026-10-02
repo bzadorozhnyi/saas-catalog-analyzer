@@ -7,6 +7,7 @@ import logfire
 
 from app.ai.embeddings import embedding_client
 from app.core.config import settings
+from app.core.observability import parse_trace_context
 from app.db.session import async_session_factory
 from app.repositories.catalog_repository import CatalogRepository
 from app.repositories.embedding_cache_repository import EmbeddingCacheRepository
@@ -70,16 +71,32 @@ class CatalogCreationConsumer:
                 worker_id=self._worker_id,
             )
 
-            heartbeat_task = asyncio.create_task(self._heartbeat(request_id, receipt_handle))
-            try:
-                outcome = await worker_service.process(request, attempt)
-            except Exception:
-                # process() only re-raises when it could not even persist the
-                # failure (e.g. DB unreachable) — leave the message for redelivery.
-                heartbeat_task.cancel()
-                return
-            finally:
-                heartbeat_task.cancel()
+            # Re-attaches the span active when the API created this request
+            # as the parent context, so everything below (this span, the
+            # heartbeat task's own spans — asyncio.create_task copies the
+            # current context automatically — and anything instrumented
+            # inside process()) nests under that original trace instead of
+            # starting a disconnected one, even though we're in a completely
+            # separate process from the request that created it.
+            with (
+                logfire.attach_context(parse_trace_context(request.trace_context)),
+                logfire.span(
+                    "process catalog creation attempt",
+                    request_id=str(request.id),
+                    attempt_number=attempt.attempt_number,
+                ),
+            ):
+                heartbeat_task = asyncio.create_task(self._heartbeat(request_id, receipt_handle))
+                try:
+                    outcome = await worker_service.process(request, attempt)
+                except Exception:
+                    # process() only re-raises when it could not even persist
+                    # the failure (e.g. DB unreachable) — leave the message
+                    # for redelivery.
+                    heartbeat_task.cancel()
+                    return
+                finally:
+                    heartbeat_task.cancel()
 
         if outcome == AttemptOutcome.FAILED:
             # Recorded as FAILED, but not terminal — leave the message alone

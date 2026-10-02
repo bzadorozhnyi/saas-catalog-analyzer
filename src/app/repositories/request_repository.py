@@ -6,7 +6,7 @@ from sqlalchemy import CursorResult, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func
 
-from app.core.observability import current_trace_id
+from app.core.observability import current_trace_context, current_trace_id
 from app.enums.request_status_enum import RequestStatusEnum
 from app.enums.request_type_enum import RequestTypeEnum
 from app.models.request import Request
@@ -22,6 +22,7 @@ class RequestRepository:
             request_type=request_type,
             payload=payload,
             trace_id=current_trace_id(),
+            trace_context=current_trace_context(),
         )
         self._session.add(request)
         return request

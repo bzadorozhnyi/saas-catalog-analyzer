@@ -42,6 +42,7 @@ impl TypstRenderer {
     /// from the template via `json("data.json")`) into PDF bytes.
     /// Template-agnostic — the caller decides what `source_text` and
     /// `data_json` contain; this function has no idea what a "report" is.
+    #[tracing::instrument(skip(self, source_text, data_json))]
     pub fn render(&self, source_text: String, data_json: Vec<u8>) -> anyhow::Result<Vec<u8>> {
         let main_id = Self::file_id("/main.typ");
         let data_id = Self::file_id("/data.json");

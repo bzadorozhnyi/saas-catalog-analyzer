@@ -1,5 +1,6 @@
 use report_service::aws_clients::{build_s3_client, build_sqs_client};
 use report_service::consumers::report_generation_consumer::ReportGenerationConsumer;
+use report_service::observability::init_tracing;
 use report_service::rendering::typst_renderer::TypstRenderer;
 use report_service::reporting::context::ReportingContext;
 use report_service::repositories::duplicate_repository::DuplicateRepository;
@@ -16,11 +17,8 @@ const WAIT_SECONDS: i32 = 20;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
-
     let settings = Settings::load()?;
+    init_tracing(settings.otel_exporter_otlp_endpoint.as_deref())?;
 
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(5)

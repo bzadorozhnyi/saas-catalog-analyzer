@@ -42,6 +42,19 @@ services:
       timeout: 3s
       retries: 5
 
+  jaeger:
+    image: jaegertracing/all-in-one:1.65.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # UI
+      - "4318:4318" # OTLP/HTTP receiver
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:16686"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   migrate:
     build:
       context: .
@@ -67,6 +80,8 @@ services:
       SQS__ENDPOINT_URL: http://localstack:4566
       S3__ENDPOINT_URL: http://localstack:4566
       REDIS__HOST: redis
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      LOGFIRE_SERVICE_NAME: api
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -75,6 +90,8 @@ services:
       localstack:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     restart: unless-stopped
 
@@ -89,12 +106,16 @@ services:
       SQS__ENDPOINT_URL: http://localstack:4566
       S3__ENDPOINT_URL: http://localstack:4566
       REDIS__HOST: redis
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      LOGFIRE_SERVICE_NAME: dispatcher
     depends_on:
       migrate:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
       localstack:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     restart: unless-stopped
 
@@ -109,12 +130,16 @@ services:
       SQS__ENDPOINT_URL: http://localstack:4566
       S3__ENDPOINT_URL: http://localstack:4566
       REDIS__HOST: redis
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      LOGFIRE_SERVICE_NAME: catalog-worker
     depends_on:
       migrate:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
       localstack:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     restart: unless-stopped
 
@@ -127,12 +152,15 @@ services:
       DB__HOST: postgres
       SQS__ENDPOINT_URL: http://localstack:4566
       S3__ENDPOINT_URL: http://localstack:4566
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     depends_on:
       migrate:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
       localstack:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     restart: unless-stopped
 

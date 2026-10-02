@@ -133,6 +133,7 @@ pub struct Settings {
     pub s3: S3Settings,
     #[serde(default)]
     pub worker: WorkerSettings,
+    pub otel_exporter_otlp_endpoint: Option<String>,
 }
 
 impl Settings {

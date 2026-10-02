@@ -13,6 +13,7 @@ impl ReportDocumentRepository {
         Self { pool }
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn create(&self, request_id: Uuid, blob_name: &str) -> sqlx::Result<ReportDocument> {
         sqlx::query_as!(
             ReportDocument,

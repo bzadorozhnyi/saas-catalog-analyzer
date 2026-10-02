@@ -14,4 +14,5 @@ pub struct Request {
     pub locked_by: Option<String>,
     pub locked_until: Option<DateTime<Utc>>,
     pub trace_id: Option<String>,
+    pub trace_context: Option<String>,
 }
