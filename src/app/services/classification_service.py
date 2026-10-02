@@ -9,7 +9,9 @@ from app.enums.llm_call_status_enum import LlmCallStatusEnum
 
 
 class ClassificationService:
-    async def classify(self, name: str, description: str) -> ClassificationResult:
+    async def classify(
+        self, name: str, description: str, trace_id: str | None = None
+    ) -> ClassificationResult:
         prompt = f"Name: {name}\nDescription: {description}"
         started_at = time.monotonic()
         try:
@@ -22,6 +24,7 @@ class ClassificationService:
                 output_tokens=None,
                 latency_ms=int((time.monotonic() - started_at) * 1000),
                 status=LlmCallStatusEnum.ERROR,
+                trace_id=trace_id,
             )
             raise
 
@@ -33,5 +36,6 @@ class ClassificationService:
             output_tokens=usage.output_tokens,
             latency_ms=int((time.monotonic() - started_at) * 1000),
             status=LlmCallStatusEnum.SUCCESS,
+            trace_id=trace_id,
         )
         return run_result.output

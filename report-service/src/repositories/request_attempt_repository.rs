@@ -52,15 +52,17 @@ impl RequestAttemptRepository {
         executor: impl PgExecutor<'_>,
         attempt_id: Uuid,
         success_message: &str,
+        trace_id: Option<&str>,
     ) -> sqlx::Result<()> {
         sqlx::query!(
             r#"
             UPDATE request_attempts
-            SET status = 'SUCCEEDED', success_message = $2, finished_at = now()
+            SET status = 'SUCCEEDED', success_message = $2, trace_id = $3, finished_at = now()
             WHERE id = $1
             "#,
             attempt_id,
             success_message,
+            trace_id,
         )
         .execute(executor)
         .await?;
@@ -71,15 +73,17 @@ impl RequestAttemptRepository {
         executor: impl PgExecutor<'_>,
         attempt_id: Uuid,
         error_message: &str,
+        trace_id: Option<&str>,
     ) -> sqlx::Result<()> {
         sqlx::query!(
             r#"
             UPDATE request_attempts
-            SET status = 'FAILED', error_message = $2, finished_at = now()
+            SET status = 'FAILED', error_message = $2, trace_id = $3, finished_at = now()
             WHERE id = $1
             "#,
             attempt_id,
             error_message,
+            trace_id,
         )
         .execute(executor)
         .await?;

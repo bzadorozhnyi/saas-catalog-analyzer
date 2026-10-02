@@ -66,6 +66,7 @@ impl RequestService {
         RequestRepository::extend_lock(&self.pool, request_id, worker_id, lock_duration).await
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn complete(
         &self,
         request_id: Uuid,
@@ -73,13 +74,15 @@ impl RequestService {
         attempt_id: Uuid,
         result_item_id: Option<i32>,
         success_message: &str,
+        trace_id: Option<&str>,
     ) -> sqlx::Result<bool> {
         let mut tx = self.pool.begin().await?;
 
         let completed =
             RequestRepository::complete(&mut *tx, request_id, worker_id, result_item_id).await?;
         if completed {
-            RequestAttemptRepository::succeed(&mut *tx, attempt_id, success_message).await?;
+            RequestAttemptRepository::succeed(&mut *tx, attempt_id, success_message, trace_id)
+                .await?;
         }
 
         tx.commit().await?;
@@ -95,12 +98,13 @@ impl RequestService {
         worker_id: &str,
         attempt_id: Uuid,
         error_message: &str,
+        trace_id: Option<&str>,
     ) -> sqlx::Result<bool> {
         let mut tx = self.pool.begin().await?;
 
         let updated = RequestRepository::fail(&mut *tx, request_id, worker_id).await?;
         if updated {
-            RequestAttemptRepository::fail(&mut *tx, attempt_id, error_message).await?;
+            RequestAttemptRepository::fail(&mut *tx, attempt_id, error_message, trace_id).await?;
         }
 
         tx.commit().await?;

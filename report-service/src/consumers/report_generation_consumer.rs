@@ -148,7 +148,7 @@ impl ReportGenerationConsumer {
         let _heartbeat = self.spawn_heartbeat(request_id, &receipt_handle);
 
         if let Err(error) = self.execute_attempt(&request, &attempt).await {
-            error!(%error, %request_id, "attempt failed");
+            error!(%error, %request_id, trace_id = ?request.trace_id, "attempt failed");
 
             let is_permanent = error
                 .downcast_ref::<ReportingError>()
@@ -290,10 +290,11 @@ impl ReportGenerationConsumer {
                 attempt.id,
                 Some(report_document.id),
                 &success_message,
+                request.trace_id.as_deref(),
             )
             .await?;
         if completed {
-            info!(request_id = %request.id, "report request completed");
+            info!(request_id = %request.id, trace_id = ?request.trace_id, "report request completed");
         } else {
             // Another worker already took over — nothing left for us to do.
             warn!(request_id = %request.id, "lost claim on request, another worker took over");
@@ -311,7 +312,13 @@ impl ReportGenerationConsumer {
         error: &anyhow::Error,
     ) -> anyhow::Result<()> {
         self.request_service
-            .fail(request.id, &self.worker_id, attempt.id, &error.to_string())
+            .fail(
+                request.id,
+                &self.worker_id,
+                attempt.id,
+                &error.to_string(),
+                request.trace_id.as_deref(),
+            )
             .await?;
         Ok(())
     }

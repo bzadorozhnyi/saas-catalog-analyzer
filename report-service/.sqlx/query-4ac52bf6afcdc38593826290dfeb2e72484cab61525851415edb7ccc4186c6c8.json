@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE request_attempts\n            SET status = 'SUCCEEDED', success_message = $2, trace_id = $3, finished_at = now()\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4ac52bf6afcdc38593826290dfeb2e72484cab61525851415edb7ccc4186c6c8"
+}
