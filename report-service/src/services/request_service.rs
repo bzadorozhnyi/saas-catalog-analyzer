@@ -5,7 +5,16 @@ use uuid::Uuid;
 use crate::dto::request::Request;
 use crate::dto::request_attempt::RequestAttempt;
 use crate::repositories::request_attempt_repository::RequestAttemptRepository;
-use crate::repositories::request_repository::RequestRepository;
+use crate::repositories::request_repository::{ClaimAttempt, RequestRepository};
+
+/// What the caller should do about the SQS message after a `claim()` call —
+/// see `request_repository::ClaimAttempt` for why "not claimed" needs more
+/// than a boolean.
+pub enum RequestClaim {
+    Claimed(Request, Box<RequestAttempt>),
+    NotYetQueued,
+    Unclaimable,
+}
 
 /// Composes `RequestRepository` and `RequestAttemptRepository` in a single
 /// transaction per operation — a claim and its attempt row (or a
@@ -30,15 +39,21 @@ impl RequestService {
         request_id: Uuid,
         worker_id: &str,
         lock_duration: Duration,
-    ) -> sqlx::Result<Option<(Request, RequestAttempt)>> {
+    ) -> sqlx::Result<RequestClaim> {
         let mut tx = self.pool.begin().await?;
 
-        let Some(request) =
-            RequestRepository::claim(&mut *tx, request_id, worker_id, lock_duration).await?
-        else {
-            tx.rollback().await?;
-            return Ok(None);
-        };
+        let request =
+            match RequestRepository::claim(&mut tx, request_id, worker_id, lock_duration).await? {
+                ClaimAttempt::Claimed(request) => request,
+                ClaimAttempt::NotYetQueued => {
+                    tx.rollback().await?;
+                    return Ok(RequestClaim::NotYetQueued);
+                }
+                ClaimAttempt::Unclaimable => {
+                    tx.rollback().await?;
+                    return Ok(RequestClaim::Unclaimable);
+                }
+            };
 
         let attempt_number =
             RequestAttemptRepository::count_for_request(&mut *tx, request_id).await? + 1;
@@ -50,7 +65,7 @@ impl RequestService {
         .await?;
 
         tx.commit().await?;
-        Ok(Some((request, attempt)))
+        Ok(RequestClaim::Claimed(request, Box::new(attempt)))
     }
 
     /// Standalone query — no attempt-table involvement, so it runs directly

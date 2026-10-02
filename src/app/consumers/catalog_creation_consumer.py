@@ -18,7 +18,7 @@ from app.services.catalog_creation_worker_service import (
 )
 from app.services.classification_service import ClassificationService
 from app.services.embedding_service import EmbeddingService
-from app.services.request_service import RequestService
+from app.services.request_service import ClaimOutcome, RequestService
 from app.services.sqs_service import SQSService
 
 
@@ -48,8 +48,14 @@ class CatalogCreationConsumer:
                 session, RequestRepository(session), RequestAttemptRepository(session)
             )
             claimed = await request_service.claim(request_id, self._worker_id)
-            if claimed is None:
-                await self._sqs_service.delete_message(receipt_handle)
+            if isinstance(claimed, ClaimOutcome):
+                if claimed == ClaimOutcome.UNCLAIMABLE:
+                    await self._sqs_service.delete_message(receipt_handle)
+                # NOT_YET_QUEUED: the dispatcher's SQS send and its
+                # mark_queued commit aren't one atomic operation — this
+                # message beat the status update to QUEUED. Not a
+                # duplicate: leave it for SQS's own redelivery instead of
+                # deleting it.
                 return
             request, attempt = claimed
 

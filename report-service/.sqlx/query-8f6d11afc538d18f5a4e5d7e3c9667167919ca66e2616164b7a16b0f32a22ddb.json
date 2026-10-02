@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT status AS \"status: RequestStatus\" FROM requests WHERE id = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status: RequestStatus",
+        "type_info": {
+          "Custom": {
+            "name": "requeststatusenum",
+            "kind": {
+              "Enum": [
+                "PENDING",
+                "QUEUED",
+                "PROCESSING",
+                "COMPLETED",
+                "FAILED"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "requests",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8f6d11afc538d18f5a4e5d7e3c9667167919ca66e2616164b7a16b0f32a22ddb"
+}
