@@ -109,7 +109,8 @@ impl RequestRepository {
                 payload,
                 locked_by,
                 locked_until,
-                trace_id
+                trace_id,
+                trace_context
             "#,
             request_id,
             worker_id,

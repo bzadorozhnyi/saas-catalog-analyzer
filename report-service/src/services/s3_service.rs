@@ -16,6 +16,7 @@ impl S3Service {
         }
     }
 
+    #[tracing::instrument(skip(self, bytes))]
     pub async fn upload(
         &self,
         key: &str,

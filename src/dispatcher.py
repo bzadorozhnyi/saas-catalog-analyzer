@@ -3,7 +3,7 @@ import asyncio
 import logfire
 
 from app.core.config import settings
-from app.core.observability import configure_logfire
+from app.core.observability import configure_logfire, parse_trace_context
 from app.core.sqs import build_queue_url, sqs_client
 from app.db.session import async_session_factory
 from app.enums.request_type_enum import RequestTypeEnum
@@ -30,13 +30,17 @@ async def dispatch_once(sqs_services: dict[RequestTypeEnum, SQSService]) -> None
                     request_type=request.request_type,
                 )
                 continue
-            try:
-                await sqs_service.send_message({"request_id": str(request.id)})
-                await request_service.mark_queued(request.id)
-            except Exception:
-                logfire.exception(
-                    "Failed to dispatch request {request_id} to SQS", request_id=request.id
-                )
+            with (
+                logfire.attach_context(parse_trace_context(request.trace_context)),
+                logfire.span("dispatch request", request_id=str(request.id)),
+            ):
+                try:
+                    await sqs_service.send_message({"request_id": str(request.id)})
+                    await request_service.mark_queued(request.id)
+                except Exception:
+                    logfire.exception(
+                        "Failed to dispatch request {request_id} to SQS", request_id=request.id
+                    )
 
 
 async def main() -> None:

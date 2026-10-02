@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            UPDATE requests\n            SET status = 'PROCESSING', locked_by = $2, locked_until = $3\n            WHERE id = $1\n              AND (\n                status = 'QUEUED'\n                OR status = 'FAILED'\n                OR (status = 'PROCESSING' AND locked_until < now())\n              )\n            RETURNING\n                id,\n                request_type AS \"request_type: RequestType\",\n                status AS \"status: RequestStatus\",\n                payload,\n                locked_by,\n                locked_until,\n                trace_id\n            ",
+  "query": "\n            UPDATE requests\n            SET status = 'PROCESSING', locked_by = $2, locked_until = $3\n            WHERE id = $1\n              AND (\n                status = 'QUEUED'\n                OR status = 'FAILED'\n                OR (status = 'PROCESSING' AND locked_until < now())\n              )\n            RETURNING\n                id,\n                request_type AS \"request_type: RequestType\",\n                status AS \"status: RequestStatus\",\n                payload,\n                locked_by,\n                locked_until,\n                trace_id,\n                trace_context\n            ",
   "describe": {
     "columns": [
       {
@@ -102,6 +102,17 @@
             "name": "trace_id"
           }
         }
+      },
+      {
+        "ordinal": 7,
+        "name": "trace_context",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "requests",
+            "name": "trace_context"
+          }
+        }
       }
     ],
     "parameters": {
@@ -118,8 +129,9 @@
       false,
       true,
       true,
+      true,
       true
     ]
   },
-  "hash": "96acf7b2f9b99ef657f0df4a5063f48635aded2c83f61681a5574f992ccfae45"
+  "hash": "9aa8d4e69e70dc7ef4d525d279f9595c5961b9b741f855fe41a2d252d2c5ec90"
 }

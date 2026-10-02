@@ -3,13 +3,15 @@ use chrono::Duration as ChronoDuration;
 use serde_json::Value;
 use std::time::Duration as StdDuration;
 use tokio::task::JoinHandle;
-use tracing::{error, info, warn};
+use tracing::{Instrument, error, info, warn};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
 use crate::dto::request::Request;
 use crate::dto::request_attempt::RequestAttempt;
 use crate::enums::content_type_enum::ContentType;
 use crate::errors::reporting_error::ReportingError;
+use crate::observability::remote_parent_context;
 use crate::rendering::typst_renderer::TypstRenderer;
 use crate::reporting::context::ReportingContext;
 use crate::reporting::registry::build_report;
@@ -150,20 +152,45 @@ impl ReportGenerationConsumer {
             }
         };
 
-        // Keeps the lock alive past `lock_duration` while a slow attempt
-        // (e.g. Typst rendering with a cold `@preview` package cache) is
-        // still running — dropped (and so aborted) as soon as
-        // `execute_attempt` returns, success or failure alike.
-        let _heartbeat = self.spawn_heartbeat(request_id, &receipt_handle);
+        // Re-attaches the span active when the API created this request as
+        // the parent, so everything below (this span, the heartbeat task's
+        // own spans, and every #[instrument]-annotated function called
+        // inside process_claimed) nests under that original trace instead
+        // of starting a disconnected one — even though we're in a
+        // completely different process from the one that created it.
+        let span =
+            tracing::info_span!("process report generation attempt", request_id = %request.id);
+        if let Err(error) = span.set_parent(remote_parent_context(request.trace_context.as_deref()))
+        {
+            warn!(%error, %request_id, "failed to re-attach parent trace context");
+        }
 
-        if let Err(error) = self.execute_attempt(&request, &attempt).await {
+        self.process_claimed(&request, &attempt, &receipt_handle)
+            .instrument(span)
+            .await
+    }
+
+    /// Keeps the lock alive past `lock_duration` while a slow attempt (e.g.
+    /// Typst rendering with a cold `@preview` package cache) is still
+    /// running — dropped (and so aborted) as soon as `execute_attempt`
+    /// returns, success or failure alike.
+    async fn process_claimed(
+        &self,
+        request: &Request,
+        attempt: &RequestAttempt,
+        receipt_handle: &str,
+    ) -> anyhow::Result<()> {
+        let request_id = request.id;
+        let _heartbeat = self.spawn_heartbeat(request_id, receipt_handle);
+
+        if let Err(error) = self.execute_attempt(request, attempt).await {
             error!(%error, %request_id, trace_id = ?request.trace_id, "attempt failed");
 
             let is_permanent = error
                 .downcast_ref::<ReportingError>()
                 .is_some_and(|error| !error.is_retryable());
 
-            if let Err(fail_error) = self.fail_attempt(&request, &attempt, &error).await {
+            if let Err(fail_error) = self.fail_attempt(request, attempt, &error).await {
                 error!(%fail_error, %request_id, "could not record failure, leaving for redelivery");
                 return Err(fail_error);
             }
@@ -177,7 +204,7 @@ impl ReportGenerationConsumer {
             // for something that can never succeed — delete now.
         }
 
-        self.delete_or_log(&receipt_handle).await;
+        self.delete_or_log(receipt_handle).await;
         Ok(())
     }
 

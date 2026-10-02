@@ -34,6 +34,13 @@ class Request(BaseModel):
     # re-reads this row via claim(), so a request's whole journey across
     # both services is correlatable by one ID even without a tracing backend.
     trace_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Full W3C `traceparent` header ("00-<trace_id>-<span_id>-<flags>"),
+    # unlike trace_id above which is just the 32-hex trace_id substring.
+    # trace_id is enough for human/DB correlation (grep/query by it); this
+    # is what a consumer needs to re-attach the original request's span as
+    # the *parent* of its own new span — trace_id alone can't do that, since
+    # a span also needs to know which specific span to nest under.
+    trace_context: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

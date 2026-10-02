@@ -14,6 +14,7 @@ pub struct RenderRequest {
 /// match arm may call a differently-typed `build()`, since it serializes to
 /// bytes immediately — adding a new report kind or version only means adding
 /// a new arm here plus its own module, never touching existing ones.
+#[tracing::instrument(skip(context))]
 pub async fn build_report(
     context: &ReportingContext,
     kind: &str,

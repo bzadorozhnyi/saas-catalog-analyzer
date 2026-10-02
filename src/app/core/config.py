@@ -70,6 +70,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="ignore")
 
     LOGFIRE_TOKEN: str | None = None
+    OTEL_EXPORTER_OTLP_ENDPOINT: str | None = None
     DB: DbSettings
     AI: AiSettings
     WORKER: WorkerSettings = WorkerSettings()
