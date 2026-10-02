@@ -16,7 +16,7 @@ class EmbeddingService:
         self._client = client
         self._cache_repository = cache_repository
 
-    async def get_embedding(self, text: str) -> list[float]:
+    async def get_embedding(self, text: str, trace_id: str | None = None) -> list[float]:
         content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
 
         cached = await self._cache_repository.get(content_hash)
@@ -34,6 +34,7 @@ class EmbeddingService:
                 output_tokens=None,
                 latency_ms=int((time.monotonic() - started_at) * 1000),
                 status=LlmCallStatusEnum.ERROR,
+                trace_id=trace_id,
             )
             raise
 
@@ -44,6 +45,7 @@ class EmbeddingService:
             output_tokens=None,
             latency_ms=int((time.monotonic() - started_at) * 1000),
             status=LlmCallStatusEnum.SUCCESS,
+            trace_id=trace_id,
         )
         await self._cache_repository.set(content_hash, result.embedding)
         return result.embedding

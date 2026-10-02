@@ -51,10 +51,15 @@ class CatalogCreationWorkerService:
             logfire.warning(
                 "Lost claim on request {request_id}, another worker took over",
                 request_id=request.id,
+                trace_id=request.trace_id,
             )
             return AttemptOutcome.CLAIM_LOST
         except Exception as error:
-            logfire.exception("Attempt failed for request {request_id}", request_id=request.id)
+            logfire.exception(
+                "Attempt failed for request {request_id}",
+                request_id=request.id,
+                trace_id=request.trace_id,
+            )
             await self._session.rollback()
             return await self._handle_failure(request, attempt, str(error))
         return AttemptOutcome.SUCCEEDED
@@ -62,10 +67,10 @@ class CatalogCreationWorkerService:
     async def _execute_attempt(self, request: Request, attempt: RequestAttempt) -> None:
         payload = CatalogCreationPayload.model_validate(request.payload)
         classification = await self._classification_service.classify(
-            payload.name, payload.description
+            payload.name, payload.description, trace_id=request.trace_id
         )
         embedding = await self._embedding_service.get_embedding(
-            f"{payload.name}: {payload.description}"
+            f"{payload.name}: {payload.description}", trace_id=request.trace_id
         )
         item = await self._catalog_repository.create(
             name=payload.name,
@@ -79,7 +84,7 @@ class CatalogCreationWorkerService:
             attempt_id=attempt.id,
             result_item_id=item.id,
             success_message=f"Created software item {item.id} ({classification.category})",
-            trace_id=None,
+            trace_id=request.trace_id,
         )
         await self._session.commit()
 
@@ -92,13 +97,14 @@ class CatalogCreationWorkerService:
                 worker_id=self._worker_id,
                 attempt_id=attempt.id,
                 error_message=error_message,
-                trace_id=None,
+                trace_id=request.trace_id,
             )
         except RequestClaimLostError:
             await self._session.rollback()
             logfire.warning(
                 "Lost claim on request {request_id} while recording failure",
                 request_id=request.id,
+                trace_id=request.trace_id,
             )
             return AttemptOutcome.CLAIM_LOST
         except Exception:

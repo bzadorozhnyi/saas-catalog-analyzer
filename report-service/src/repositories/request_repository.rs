@@ -44,7 +44,8 @@ impl RequestRepository {
                 status AS "status: RequestStatus",
                 payload,
                 locked_by,
-                locked_until
+                locked_until,
+                trace_id
             "#,
             request_id,
             worker_id,
